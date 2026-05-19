@@ -5,8 +5,9 @@ import { useRouter, usePathname } from 'next/navigation'
 import { OscRequest, Partner, OscStatus, Priority } from '@prisma/client'
 import { formatDate } from '@/lib/utils'
 import { StatusLozenge, PriorityLozenge } from '@/components/ui/lozenge'
-import { Search, ChevronLeft, ChevronRight, Pencil, X } from 'lucide-react'
+import { Search, ChevronLeft, ChevronRight, Pencil, X, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react'
 import { useCallback, useTransition, useRef } from 'react'
+import { cn } from '@/lib/utils'
 
 type OscRow = OscRequest & { partner: Partner; createdBy: { name: string } }
 
@@ -28,22 +29,93 @@ const ALL_STATUSES: { value: OscStatus; label: string }[] = [
   { value: 'CHECK_REMARKS', label: 'Check Remarks' },
 ]
 
+function SortIcon({ active, dir }: { active: boolean; dir: string }) {
+  if (!active) return <ArrowUpDown className="w-3 h-3 text-slate-300 group-hover:text-slate-400 transition-colors" />
+  if (dir === 'asc') return <ArrowUp className="w-3 h-3 text-blue-500" />
+  return <ArrowDown className="w-3 h-3 text-blue-500" />
+}
+
+function SortableTh({
+  label,
+  sortKey,
+  currentSort,
+  currentDir,
+  onSort,
+  className,
+}: {
+  label: string
+  sortKey: string
+  currentSort: string
+  currentDir: string
+  onSort: (key: string) => void
+  className?: string
+}) {
+  const active = currentSort === sortKey
+  return (
+    <th
+      className={cn(
+        'jira-table-header cursor-pointer select-none group transition-colors',
+        active ? 'bg-blue-50/60 text-blue-700' : 'hover:bg-slate-100',
+        className,
+      )}
+      onClick={() => onSort(sortKey)}
+    >
+      <div className="flex items-center gap-1.5">
+        {label}
+        <SortIcon active={active} dir={currentDir} />
+      </div>
+    </th>
+  )
+}
+
 export function OscTable({ requests, partners, total, page, pageSize, searchParams, canEdit }: OscTableProps) {
   const router = useRouter()
   const pathname = usePathname()
   const [, startTransition] = useTransition()
   const searchRef = useRef<HTMLInputElement>(null)
 
-  const setParam = useCallback(
-    (key: string, value: string) => {
+  const currentSort = searchParams.sort ?? ''
+  const currentDir = searchParams.dir ?? 'asc'
+
+  const buildParams = useCallback(
+    (overrides: Record<string, string>) => {
       const params = new URLSearchParams()
       Object.entries(searchParams).forEach(([k, v]) => {
-        if (v && k !== key && k !== 'page') params.set(k, v)
+        if (v && k !== 'page') params.set(k, v)
       })
-      if (value) params.set(key, value)
+      Object.entries(overrides).forEach(([k, v]) => {
+        if (v) params.set(k, v)
+        else params.delete(k)
+      })
+      return params.toString()
+    },
+    [searchParams],
+  )
+
+  const setParam = useCallback(
+    (key: string, value: string) => {
+      startTransition(() =>
+        router.push(`${pathname}?${buildParams({ [key]: value })}`)
+      )
+    },
+    [router, pathname, buildParams],
+  )
+
+  const handleSort = useCallback(
+    (key: string) => {
+      let newDir = 'asc'
+      if (currentSort === key) {
+        newDir = currentDir === 'asc' ? 'desc' : 'asc'
+      }
+      const params = new URLSearchParams()
+      Object.entries(searchParams).forEach(([k, v]) => {
+        if (v && k !== 'sort' && k !== 'dir' && k !== 'page') params.set(k, v)
+      })
+      params.set('sort', key)
+      params.set('dir', newDir)
       startTransition(() => router.push(`${pathname}?${params.toString()}`))
     },
-    [router, pathname, searchParams]
+    [router, pathname, searchParams, currentSort, currentDir],
   )
 
   const clearFilters = () => {
@@ -51,10 +123,18 @@ export function OscTable({ requests, partners, total, page, pageSize, searchPara
     startTransition(() => router.push(pathname))
   }
 
-  const hasFilters = searchParams.search || searchParams.status || searchParams.partner || searchParams.priority
+  const hasFilters =
+    searchParams.search ||
+    searchParams.status ||
+    searchParams.partner ||
+    searchParams.priority ||
+    searchParams.sort
+
   const totalPages = Math.ceil(total / pageSize)
   const start = (page - 1) * pageSize + 1
   const end = Math.min(page * pageSize, total)
+
+  const sharedSortProps = { currentSort, currentDir, onSort: handleSort }
 
   return (
     <div className="space-y-3">
@@ -73,20 +153,33 @@ export function OscTable({ requests, partners, total, page, pageSize, searchPara
             />
           </div>
 
-          <select value={searchParams.status ?? ''} onChange={(e) => setParam('status', e.target.value)}
-            className="jira-input py-2 w-auto cursor-pointer">
+          <select
+            value={searchParams.status ?? ''}
+            onChange={(e) => setParam('status', e.target.value)}
+            className="jira-input py-2 w-auto cursor-pointer"
+          >
             <option value="">All Statuses</option>
-            {ALL_STATUSES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+            {ALL_STATUSES.map((s) => (
+              <option key={s.value} value={s.value}>{s.label}</option>
+            ))}
           </select>
 
-          <select value={searchParams.partner ?? ''} onChange={(e) => setParam('partner', e.target.value)}
-            className="jira-input py-2 w-auto cursor-pointer">
+          <select
+            value={searchParams.partner ?? ''}
+            onChange={(e) => setParam('partner', e.target.value)}
+            className="jira-input py-2 w-auto cursor-pointer"
+          >
             <option value="">All Partners</option>
-            {partners.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+            {partners.map((p) => (
+              <option key={p.id} value={p.id}>{p.name}</option>
+            ))}
           </select>
 
-          <select value={searchParams.priority ?? ''} onChange={(e) => setParam('priority', e.target.value)}
-            className="jira-input py-2 w-auto cursor-pointer">
+          <select
+            value={searchParams.priority ?? ''}
+            onChange={(e) => setParam('priority', e.target.value)}
+            className="jira-input py-2 w-auto cursor-pointer"
+          >
             <option value="">All Priorities</option>
             <option value="HIGH_PRIO">High Priority</option>
             <option value="LOW_PRIO">Low Priority</option>
@@ -106,15 +199,15 @@ export function OscTable({ requests, partners, total, page, pageSize, searchPara
           <table className="w-full">
             <thead>
               <tr className="border-b border-slate-100">
-                <th className="jira-table-header">PopZone</th>
-                <th className="jira-table-header">Partner</th>
-                <th className="jira-table-header">Status</th>
-                <th className="jira-table-header">Priority</th>
-                <th className="jira-table-header">Received</th>
-                <th className="jira-table-header">OSC Request</th>
-                <th className="jira-table-header">Mail Sent</th>
-                <th className="jira-table-header max-w-[160px]">Remark</th>
-                <th className="jira-table-header w-8"></th>
+                <SortableTh label="PopZone"    sortKey="popzone"      {...sharedSortProps} />
+                <SortableTh label="Partner"    sortKey="partner"      {...sharedSortProps} />
+                <SortableTh label="Status"     sortKey="status"       {...sharedSortProps} />
+                <SortableTh label="Priority"   sortKey="priority"     {...sharedSortProps} />
+                <SortableTh label="Received"   sortKey="receivedDate" {...sharedSortProps} />
+                <SortableTh label="OSC Request" sortKey="oscRequestDate" {...sharedSortProps} />
+                <SortableTh label="Mail Sent"  sortKey="mailSentDate" {...sharedSortProps} />
+                <SortableTh label="Remark"     sortKey="remark"       {...sharedSortProps} className="max-w-[160px]" />
+                <th className="jira-table-header w-8" />
               </tr>
             </thead>
             <tbody>
@@ -128,28 +221,40 @@ export function OscTable({ requests, partners, total, page, pageSize, searchPara
                 requests.map((req) => (
                   <tr key={req.id} className="jira-table-row">
                     <td className="jira-table-cell whitespace-nowrap">
-                      <Link href={`/osc/${req.id}`}
-                        className="text-blue-600 hover:text-blue-700 font-medium hover:underline">
+                      <Link
+                        href={`/osc/${req.id}`}
+                        className="text-blue-600 hover:text-blue-700 font-medium hover:underline"
+                      >
                         {req.popzone}
                       </Link>
                     </td>
-                    <td className="jira-table-cell text-slate-600 whitespace-nowrap">{req.partner.name}</td>
+                    <td className="jira-table-cell text-slate-600 whitespace-nowrap">
+                      {req.partner.name}
+                    </td>
                     <td className="jira-table-cell whitespace-nowrap">
                       <StatusLozenge status={req.status as OscStatus} />
                     </td>
                     <td className="jira-table-cell whitespace-nowrap">
                       <PriorityLozenge priority={req.priority as Priority} />
                     </td>
-                    <td className="jira-table-cell text-slate-500 whitespace-nowrap">{formatDate(req.receivedDate)}</td>
-                    <td className="jira-table-cell text-slate-500 whitespace-nowrap">{formatDate(req.oscRequestDate)}</td>
-                    <td className="jira-table-cell text-slate-500 whitespace-nowrap">{formatDate(req.mailSentDate)}</td>
+                    <td className="jira-table-cell text-slate-500 whitespace-nowrap tabular-nums">
+                      {formatDate(req.receivedDate)}
+                    </td>
+                    <td className="jira-table-cell text-slate-500 whitespace-nowrap tabular-nums">
+                      {formatDate(req.oscRequestDate)}
+                    </td>
+                    <td className="jira-table-cell text-slate-500 whitespace-nowrap tabular-nums">
+                      {formatDate(req.mailSentDate)}
+                    </td>
                     <td className="jira-table-cell text-slate-500 max-w-[160px]">
                       <span className="truncate block">{req.remark || '—'}</span>
                     </td>
                     <td className="jira-table-cell">
                       {canEdit && (
-                        <Link href={`/osc/${req.id}/edit`}
-                          className="p-1.5 rounded-lg hover:bg-slate-100 inline-flex text-slate-400 hover:text-slate-600 transition-colors">
+                        <Link
+                          href={`/osc/${req.id}/edit`}
+                          className="p-1.5 rounded-lg hover:bg-slate-100 inline-flex text-slate-400 hover:text-slate-600 transition-colors"
+                        >
                           <Pencil className="w-3.5 h-3.5" />
                         </Link>
                       )}
@@ -168,13 +273,21 @@ export function OscTable({ requests, partners, total, page, pageSize, searchPara
               Showing {start}–{end} of {total.toLocaleString()}
             </span>
             <div className="flex items-center gap-1">
-              <button onClick={() => setParam('page', String(page - 1))} disabled={page === 1}
-                className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+              <button
+                onClick={() => setParam('page', String(page - 1))}
+                disabled={page === 1}
+                className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              >
                 <ChevronLeft className="w-4 h-4" />
               </button>
-              <span className="text-xs text-slate-500 px-2">Page {page} of {totalPages}</span>
-              <button onClick={() => setParam('page', String(page + 1))} disabled={page >= totalPages}
-                className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+              <span className="text-xs text-slate-500 px-2">
+                Page {page} of {totalPages}
+              </span>
+              <button
+                onClick={() => setParam('page', String(page + 1))}
+                disabled={page >= totalPages}
+                className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              >
                 <ChevronRight className="w-4 h-4" />
               </button>
             </div>

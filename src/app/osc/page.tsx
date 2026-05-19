@@ -13,10 +13,43 @@ interface PageProps {
     partner?: string
     priority?: string
     page?: string
+    sort?: string
+    dir?: string
   }
 }
 
 const PAGE_SIZE = 25
+
+type SortDir = 'asc' | 'desc'
+
+function buildOrderBy(sort?: string, dir?: string) {
+  const d: SortDir = dir === 'desc' ? 'desc' : 'asc'
+
+  switch (sort) {
+    case 'popzone':
+      return [{ popzone: d }]
+    case 'partner':
+      return [{ partner: { name: d } }]
+    case 'status':
+      return [{ status: d }]
+    case 'priority':
+      return [{ priority: { sort: d, nulls: 'last' as const } }]
+    case 'receivedDate':
+      return [{ receivedDate: { sort: d, nulls: 'last' as const } }]
+    case 'oscRequestDate':
+      return [{ oscRequestDate: { sort: d, nulls: 'last' as const } }]
+    case 'mailSentDate':
+      return [{ mailSentDate: { sort: d, nulls: 'last' as const } }]
+    case 'remark':
+      return [{ remark: { sort: d, nulls: 'last' as const } }]
+    default:
+      return [
+        { priority: { sort: 'asc' as const, nulls: 'last' as const } },
+        { receivedDate: { sort: 'desc' as const, nulls: 'last' as const } },
+        { createdAt: 'desc' as const },
+      ]
+  }
+}
 
 export default async function OscListPage({ searchParams }: PageProps) {
   const session = await getSession()
@@ -43,11 +76,7 @@ export default async function OscListPage({ searchParams }: PageProps) {
       where,
       skip,
       take: PAGE_SIZE,
-      orderBy: [
-        { priority: { sort: 'asc', nulls: 'last' } },
-        { receivedDate: { sort: 'desc', nulls: 'last' } },
-        { createdAt: 'desc' },
-      ],
+      orderBy: buildOrderBy(searchParams.sort, searchParams.dir),
       include: { partner: true, createdBy: { select: { name: true } } },
     }),
     prisma.oscRequest.count({ where }),
