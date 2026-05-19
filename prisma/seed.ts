@@ -48,42 +48,16 @@ async function main() {
   // Create admin user
   const adminPassword = await bcrypt.hash('admin123', 10)
   const admin = await prisma.user.upsert({
-    where: { email: 'admin@osc.be' },
+    where: { email: 'admin@mdesign.ma' },
     update: {},
     create: {
-      name: 'Admin User',
-      email: 'admin@osc.be',
+      name: 'Admin',
+      email: 'admin@mdesign.ma',
       password: adminPassword,
       role: Role.ADMIN,
     },
   })
   console.log('Created admin:', admin.email)
-
-  // Create support engineer
-  const supportPassword = await bcrypt.hash('support123', 10)
-  await prisma.user.upsert({
-    where: { email: 'support@osc.be' },
-    update: {},
-    create: {
-      name: 'Support Engineer',
-      email: 'support@osc.be',
-      password: supportPassword,
-      role: Role.SUPPORT_ENGINEER,
-    },
-  })
-
-  // Create extern user
-  const externPassword = await bcrypt.hash('extern123', 10)
-  await prisma.user.upsert({
-    where: { email: 'extern@osc.be' },
-    update: {},
-    create: {
-      name: 'External User',
-      email: 'extern@osc.be',
-      password: externPassword,
-      role: Role.EXTERN,
-    },
-  })
 
   // Seed partners
   const partnerMap: Record<string, string> = {}
