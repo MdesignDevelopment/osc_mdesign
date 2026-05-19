@@ -1,0 +1,186 @@
+'use client'
+
+import Link from 'next/link'
+import { useRouter, usePathname } from 'next/navigation'
+import { OscRequest, Partner, OscStatus, Priority } from '@prisma/client'
+import { formatDate } from '@/lib/utils'
+import { StatusLozenge, PriorityLozenge } from '@/components/ui/lozenge'
+import { Search, ChevronLeft, ChevronRight, Pencil, X } from 'lucide-react'
+import { useCallback, useTransition, useRef } from 'react'
+
+type OscRow = OscRequest & { partner: Partner; createdBy: { name: string } }
+
+interface OscTableProps {
+  requests: OscRow[]
+  partners: Partner[]
+  total: number
+  page: number
+  pageSize: number
+  searchParams: Record<string, string | undefined>
+  canEdit: boolean
+}
+
+const ALL_STATUSES: { value: OscStatus; label: string }[] = [
+  { value: 'OSC_UPDATED', label: 'OSC Updated' },
+  { value: 'EMAIL_SENT', label: 'Email Sent' },
+  { value: 'EMAIL_SENT_REMINDER', label: 'Email + Reminder' },
+  { value: 'ON_HOLD', label: 'On Hold' },
+  { value: 'CHECK_REMARKS', label: 'Check Remarks' },
+]
+
+export function OscTable({ requests, partners, total, page, pageSize, searchParams, canEdit }: OscTableProps) {
+  const router = useRouter()
+  const pathname = usePathname()
+  const [, startTransition] = useTransition()
+  const searchRef = useRef<HTMLInputElement>(null)
+
+  const setParam = useCallback(
+    (key: string, value: string) => {
+      const params = new URLSearchParams()
+      Object.entries(searchParams).forEach(([k, v]) => {
+        if (v && k !== key && k !== 'page') params.set(k, v)
+      })
+      if (value) params.set(key, value)
+      startTransition(() => router.push(`${pathname}?${params.toString()}`))
+    },
+    [router, pathname, searchParams]
+  )
+
+  const clearFilters = () => {
+    if (searchRef.current) searchRef.current.value = ''
+    startTransition(() => router.push(pathname))
+  }
+
+  const hasFilters = searchParams.search || searchParams.status || searchParams.partner || searchParams.priority
+  const totalPages = Math.ceil(total / pageSize)
+  const start = (page - 1) * pageSize + 1
+  const end = Math.min(page * pageSize, total)
+
+  return (
+    <div className="space-y-3">
+      {/* Filter bar */}
+      <div className="jira-panel p-3">
+        <div className="flex flex-wrap gap-2 items-center">
+          <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-lg px-3 py-2 flex-1 min-w-[220px] hover:border-slate-300 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/20 transition">
+            <Search className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
+            <input
+              ref={searchRef}
+              type="text"
+              placeholder="Search popzone, partner, remark..."
+              defaultValue={searchParams.search ?? ''}
+              onChange={(e) => setParam('search', e.target.value)}
+              className="flex-1 text-sm bg-transparent outline-none text-slate-900 placeholder-slate-400"
+            />
+          </div>
+
+          <select value={searchParams.status ?? ''} onChange={(e) => setParam('status', e.target.value)}
+            className="jira-input py-2 w-auto cursor-pointer">
+            <option value="">All Statuses</option>
+            {ALL_STATUSES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+          </select>
+
+          <select value={searchParams.partner ?? ''} onChange={(e) => setParam('partner', e.target.value)}
+            className="jira-input py-2 w-auto cursor-pointer">
+            <option value="">All Partners</option>
+            {partners.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+          </select>
+
+          <select value={searchParams.priority ?? ''} onChange={(e) => setParam('priority', e.target.value)}
+            className="jira-input py-2 w-auto cursor-pointer">
+            <option value="">All Priorities</option>
+            <option value="HIGH_PRIO">High Priority</option>
+            <option value="LOW_PRIO">Low Priority</option>
+          </select>
+
+          {hasFilters && (
+            <button onClick={clearFilters} className="jira-btn-secondary py-2 text-xs gap-1">
+              <X className="w-3 h-3" /> Clear
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Table */}
+      <div className="jira-panel overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-slate-100">
+                <th className="jira-table-header">PopZone</th>
+                <th className="jira-table-header">Partner</th>
+                <th className="jira-table-header">Status</th>
+                <th className="jira-table-header">Priority</th>
+                <th className="jira-table-header">Received</th>
+                <th className="jira-table-header">OSC Request</th>
+                <th className="jira-table-header">Mail Sent</th>
+                <th className="jira-table-header max-w-[160px]">Remark</th>
+                <th className="jira-table-header w-8"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {requests.length === 0 ? (
+                <tr>
+                  <td colSpan={9} className="text-center py-12 text-slate-400 text-sm">
+                    No OSC requests found
+                  </td>
+                </tr>
+              ) : (
+                requests.map((req) => (
+                  <tr key={req.id} className="jira-table-row">
+                    <td className="jira-table-cell whitespace-nowrap">
+                      <Link href={`/osc/${req.id}`}
+                        className="text-blue-600 hover:text-blue-700 font-medium hover:underline">
+                        {req.popzone}
+                      </Link>
+                    </td>
+                    <td className="jira-table-cell text-slate-600 whitespace-nowrap">{req.partner.name}</td>
+                    <td className="jira-table-cell whitespace-nowrap">
+                      <StatusLozenge status={req.status as OscStatus} />
+                    </td>
+                    <td className="jira-table-cell whitespace-nowrap">
+                      <PriorityLozenge priority={req.priority as Priority} />
+                    </td>
+                    <td className="jira-table-cell text-slate-500 whitespace-nowrap">{formatDate(req.receivedDate)}</td>
+                    <td className="jira-table-cell text-slate-500 whitespace-nowrap">{formatDate(req.oscRequestDate)}</td>
+                    <td className="jira-table-cell text-slate-500 whitespace-nowrap">{formatDate(req.mailSentDate)}</td>
+                    <td className="jira-table-cell text-slate-500 max-w-[160px]">
+                      <span className="truncate block">{req.remark || '—'}</span>
+                    </td>
+                    <td className="jira-table-cell">
+                      {canEdit && (
+                        <Link href={`/osc/${req.id}/edit`}
+                          className="p-1.5 rounded-lg hover:bg-slate-100 inline-flex text-slate-400 hover:text-slate-600 transition-colors">
+                          <Pencil className="w-3.5 h-3.5" />
+                        </Link>
+                      )}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Pagination */}
+        {total > 0 && (
+          <div className="flex items-center justify-between px-4 py-3 border-t border-slate-100 bg-slate-50/50">
+            <span className="text-xs text-slate-400">
+              Showing {start}–{end} of {total.toLocaleString()}
+            </span>
+            <div className="flex items-center gap-1">
+              <button onClick={() => setParam('page', String(page - 1))} disabled={page === 1}
+                className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <span className="text-xs text-slate-500 px-2">Page {page} of {totalPages}</span>
+              <button onClick={() => setParam('page', String(page + 1))} disabled={page >= totalPages}
+                className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}

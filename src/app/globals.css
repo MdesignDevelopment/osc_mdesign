@@ -1,0 +1,77 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+
+  html {
+    font-size: 14px;
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto, sans-serif;
+    background-color: #F8FAFC;
+    color: #0F172A;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+}
+
+@layer components {
+  /* Panel / card */
+  .jira-panel {
+    @apply bg-white rounded-xl border border-slate-100 shadow-sm;
+  }
+
+  /* Section header (e.g. "Description", "Activity") */
+  .jira-section-header {
+    @apply text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2;
+  }
+
+  /* Form field label */
+  .jira-field-label {
+    @apply text-xs font-medium text-slate-500 mb-1;
+  }
+
+  .jira-field-value {
+    @apply text-sm text-slate-900;
+  }
+
+  /* Input */
+  .jira-input {
+    @apply w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm
+           text-slate-900 placeholder-slate-400 outline-none transition
+           hover:border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20;
+  }
+
+  /* Primary button */
+  .jira-btn-primary {
+    @apply inline-flex items-center gap-1.5 px-3.5 py-2 bg-blue-600 hover:bg-blue-700
+           text-white text-sm font-medium rounded-lg transition-colors
+           disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  /* Secondary button */
+  .jira-btn-secondary {
+    @apply inline-flex items-center gap-1.5 px-3.5 py-2 bg-white hover:bg-slate-50
+           text-slate-600 text-sm font-medium border border-slate-200 rounded-lg
+           transition-colors;
+  }
+
+  /* Table */
+  .jira-table-header {
+    @apply text-xs font-medium text-slate-500 uppercase tracking-wide px-4 py-3
+           bg-slate-50 text-left whitespace-nowrap;
+  }
+
+  .jira-table-cell {
+    @apply text-sm text-slate-800 px-4 py-3;
+  }
+
+  .jira-table-row {
+    @apply border-b border-slate-50 hover:bg-slate-50/60 transition-colors;
+  }
+}

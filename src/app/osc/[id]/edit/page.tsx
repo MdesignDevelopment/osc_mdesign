@@ -1,0 +1,30 @@
+import { prisma } from '@/lib/db'
+import { getSession } from '@/lib/auth'
+import { redirect, notFound } from 'next/navigation'
+import { OscForm } from '@/components/osc/osc-form'
+
+export default async function EditOscPage({ params }: { params: { id: string } }) {
+  const session = await getSession()
+  if (!session) redirect('/login')
+  if (session.user.role === 'EXTERN') redirect('/osc')
+
+  const [request, partners] = await Promise.all([
+    prisma.oscRequest.findUnique({
+      where: { id: params.id },
+      include: { partner: true },
+    }),
+    prisma.partner.findMany({ orderBy: { name: 'asc' } }),
+  ])
+
+  if (!request) notFound()
+
+  return (
+    <div className="max-w-2xl space-y-6">
+      <div>
+        <h1 className="text-xl font-semibold text-gray-900">Edit OSC Request</h1>
+        <p className="text-sm text-gray-500 mt-0.5">{request.popzone}</p>
+      </div>
+      <OscForm partners={partners} initialData={request} />
+    </div>
+  )
+}

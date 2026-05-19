@@ -1,0 +1,93 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  SUPPORT_ENGINEER
+  EXTERN
+}
+
+enum OscStatus {
+  OSC_UPDATED
+  EMAIL_SENT
+  EMAIL_SENT_REMINDER
+  ON_HOLD
+  CHECK_REMARKS
+}
+
+enum Priority {
+  HIGH_PRIO
+  LOW_PRIO
+}
+
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  password  String
+  role      Role     @default(SUPPORT_ENGINEER)
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  oscRequests OscRequest[] @relation("CreatedBy")
+  comments    OscComment[]
+  history     OscHistory[]
+}
+
+model Partner {
+  id          String       @id @default(cuid())
+  name        String       @unique
+  oscRequests OscRequest[]
+  createdAt   DateTime     @default(now())
+}
+
+model OscRequest {
+  id             String     @id @default(cuid())
+  receivedDate   DateTime?
+  partnerId      String
+  partner        Partner    @relation(fields: [partnerId], references: [id])
+  popzone        String
+  priority       Priority?
+  status         OscStatus  @default(ON_HOLD)
+  remark         String?    @db.Text
+  updatedDate    DateTime?
+  oscRequestDate DateTime?
+  mailSentDate   DateTime?
+  createdById    String
+  createdBy      User       @relation("CreatedBy", fields: [createdById], references: [id])
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  comments OscComment[]
+  history  OscHistory[]
+}
+
+model OscComment {
+  id           String     @id @default(cuid())
+  oscRequestId String
+  oscRequest   OscRequest @relation(fields: [oscRequestId], references: [id], onDelete: Cascade)
+  userId       String
+  user         User       @relation(fields: [userId], references: [id])
+  comment      String     @db.Text
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+}
+
+model OscHistory {
+  id           String     @id @default(cuid())
+  oscRequestId String
+  oscRequest   OscRequest @relation(fields: [oscRequestId], references: [id], onDelete: Cascade)
+  userId       String
+  user         User       @relation(fields: [userId], references: [id])
+  fieldChanged String
+  oldValue     String?
+  newValue     String?
+  changedAt    DateTime   @default(now())
+}
