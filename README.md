@@ -16,16 +16,6 @@ docker compose --profile migrate up migrate
 # 3. Open http://localhost:3000
 ```
 
-## Default Accounts
-
-| Role | Email | Password |
-|------|-------|----------|
-| Admin | admin@osc.be | admin123 |
-| Support Engineer | support@osc.be | support123 |
-| External | extern@osc.be | extern123 |
-
-> **Change passwords** after first login via User Management.
-
 ## Features
 
 - **Dashboard** — Stats cards, status distribution pie chart, partner bar chart, recent requests
