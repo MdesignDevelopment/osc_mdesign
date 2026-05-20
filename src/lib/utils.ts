@@ -35,12 +35,16 @@ export const STATUS_LOZENGE: Record<OscStatus, string> = {
 
 export const PRIORITY_LABELS: Record<Priority, string> = {
   HIGH_PRIO: 'High Priority',
+  MEDIUM_PRIO: 'Medium Priority',
   LOW_PRIO: 'Low Priority',
+  NOT_DEFINED: 'Not defined',
 }
 
 export const PRIORITY_LOZENGE: Record<Priority, string> = {
   HIGH_PRIO: 'bg-red-50 text-red-600 ring-1 ring-inset ring-red-200',
+  MEDIUM_PRIO: 'bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-200',
   LOW_PRIO: 'bg-slate-100 text-slate-500',
+  NOT_DEFINED: 'bg-slate-100 text-slate-400',
 }
 
 export const ROLE_LABELS = {

@@ -14,7 +14,9 @@ const STATUS_LABELS: Record<string, string> = {
 
 const PRIORITY_LABELS: Record<string, string> = {
   HIGH_PRIO: 'High Priority',
+  MEDIUM_PRIO: 'Medium Priority',
   LOW_PRIO: 'Low Priority',
+  NOT_DEFINED: 'Not defined',
 }
 
 function fmt(date: Date | null | undefined): string {

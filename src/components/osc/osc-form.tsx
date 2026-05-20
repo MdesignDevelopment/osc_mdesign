@@ -108,8 +108,9 @@ export function OscForm({ partners, initialData }: OscFormProps) {
 
           <Field label="Priority">
             <select {...register('priority')} className="jira-input">
-              <option value="">No priority</option>
+              <option value="NOT_DEFINED">Not defined</option>
               <option value="HIGH_PRIO">High Priority</option>
+              <option value="MEDIUM_PRIO">Medium Priority</option>
               <option value="LOW_PRIO">Low Priority</option>
             </select>
           </Field>
