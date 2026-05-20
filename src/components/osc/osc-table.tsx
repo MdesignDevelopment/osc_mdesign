@@ -232,7 +232,6 @@ export function OscTable({ requests, partners, total, page, pageSize, searchPara
   const sharedSortProps = { currentSort, currentDir, onSort: handleSort }
 
   const selectedRows = requests.filter((r) => selectedIds.has(r.id))
-  const mailPresetRows = selectedRows.filter((r) => r.status !== 'OSC_UPDATED')
 
   return (
     <div className="space-y-3">
@@ -449,18 +448,13 @@ export function OscTable({ requests, partners, total, page, pageSize, searchPara
             {popzoneCopied ? <Check className="w-3.5 h-3.5" /> : <Clipboard className="w-3.5 h-3.5" />}
             {popzoneCopied ? 'Copied!' : 'Copy PopZones'}
           </button>
-          {mailPresetRows.length > 0 && (
-            <button
-              onClick={() => setMailPresetOpen(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-white/8 rounded-lg transition-colors"
-            >
-              <Mail className="w-3.5 h-3.5" />
-              Mail Preset
-              {mailPresetRows.length < selectedIds.size && (
-                <span className="tabular-nums text-neutral-400 dark:text-neutral-500">({mailPresetRows.length})</span>
-              )}
-            </button>
-          )}
+          <button
+            onClick={() => setMailPresetOpen(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-white/8 rounded-lg transition-colors"
+          >
+            <Mail className="w-3.5 h-3.5" />
+            Mail Preset
+          </button>
           <div className="w-px h-4 bg-neutral-200 dark:bg-white/10 mx-1" />
           <button
             onClick={() => setSelectedIds(new Set())}
@@ -475,11 +469,11 @@ export function OscTable({ requests, partners, total, page, pageSize, searchPara
       {/* Mail preset dialog */}
       <MailPresetDialog
         open={mailPresetOpen}
-        selectedRows={mailPresetRows.map((r) => ({
+        selectedRows={selectedRows.map((r) => ({
           id: r.id,
           popzone: r.popzone,
           priority: r.priority,
-          oscRequestDate: r.oscRequestDate,
+          status: r.status,
         }))}
         canEdit={canEdit}
         userName={currentUserName}

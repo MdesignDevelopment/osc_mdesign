@@ -11,10 +11,9 @@ export interface MailPresetRow {
   id: string
   popzone: string
   priority: string | null
-  oscRequestDate: Date | string | null
+  status: string
 }
 
-// Group popzones by their MRO_..._POP prefix, comma-separating the numbers
 function groupPopzones(popzones: string[]): string {
   const groups = new Map<string, string[]>()
   for (const pz of popzones) {
@@ -37,7 +36,6 @@ function groupPopzones(popzones: string[]): string {
     })
     .join('\n')
 }
-
 
 const LABELS: Record<Lang, {
   greeting: string
@@ -115,51 +113,81 @@ export function MailPresetDialog({ open, selectedRows, canEdit, userName, onClos
   const [mailType, setMailType] = useState<MailType>('first_time')
   const [mailText, setMailText] = useState('')
   const [copied, setCopied] = useState(false)
-  const [showConfirm, setShowConfirm] = useState(false)
-  const [updating, setUpdating] = useState(false)
-  const [updated, setUpdated] = useState(false)
+
+  // Status update prompt (non-OSC_UPDATED rows)
+  const [showStatusConfirm, setShowStatusConfirm] = useState(false)
+  const [statusUpdating, setStatusUpdating] = useState(false)
+  const [statusUpdated, setStatusUpdated] = useState(false)
+
+  // Remark prompt (OSC_UPDATED rows)
+  const [showRemarkPrompt, setShowRemarkPrompt] = useState(false)
+  const [remark, setRemark] = useState('')
+  const [remarkUpdating, setRemarkUpdating] = useState(false)
+  const [remarkUpdated, setRemarkUpdated] = useState(false)
+
+  const nonUpdatedRows = selectedRows.filter((r) => r.status !== 'OSC_UPDATED')
+  const oscUpdatedRows = selectedRows.filter((r) => r.status === 'OSC_UPDATED')
 
   const reset = () => setMailText(buildMailText(selectedRows, lang, mailType, userName))
 
   useEffect(() => {
     if (open) {
       setCopied(false)
-      setShowConfirm(false)
-      setUpdated(false)
+      setShowStatusConfirm(false)
+      setShowRemarkPrompt(false)
+      setStatusUpdated(false)
+      setRemarkUpdated(false)
+      setRemark('')
     }
   }, [open])
 
   useEffect(() => {
     reset()
     setCopied(false)
-    setShowConfirm(false)
+    setShowStatusConfirm(false)
+    setShowRemarkPrompt(false)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lang, mailType, selectedRows])
 
   const handleCopy = async () => {
     await navigator.clipboard.writeText(mailText)
     setCopied(true)
-    if (canEdit) setShowConfirm(true)
+    if (canEdit) {
+      if (nonUpdatedRows.length > 0) setShowStatusConfirm(true)
+      if (oscUpdatedRows.length > 0) setShowRemarkPrompt(true)
+    }
   }
 
   const handleUpdateStatus = async () => {
-    setUpdating(true)
+    setStatusUpdating(true)
     const status = mailType === 'first_time' ? 'EMAIL_SENT' : 'EMAIL_SENT_REMINDER'
     await fetch('/api/osc/bulk-status', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ids: selectedRows.map((r) => r.id), status }),
+      body: JSON.stringify({ ids: nonUpdatedRows.map((r) => r.id), status }),
     })
-    setUpdating(false)
-    setUpdated(true)
-    setShowConfirm(false)
+    setStatusUpdating(false)
+    setStatusUpdated(true)
+    setShowStatusConfirm(false)
+    onRefresh()
+  }
+
+  const handleUpdateRemark = async () => {
+    setRemarkUpdating(true)
+    await fetch('/api/osc/bulk-status', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids: oscUpdatedRows.map((r) => r.id), remark }),
+    })
+    setRemarkUpdating(false)
+    setRemarkUpdated(true)
+    setShowRemarkPrompt(false)
     onRefresh()
   }
 
   if (!open) return null
 
   const targetStatus = mailType === 'first_time' ? 'Email Sent' : 'Email + Reminder'
-  const count = selectedRows.length
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -172,7 +200,7 @@ export function MailPresetDialog({ open, selectedRows, canEdit, userName, onClos
             <Mail className="w-4 h-4 text-blue-500" />
             <h2 className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">Mail Preset</h2>
             <span className="text-xs bg-neutral-100 dark:bg-white/10 text-neutral-500 dark:text-neutral-400 px-2 py-0.5 rounded-full tabular-nums">
-              {count} popzone{count !== 1 ? 's' : ''}
+              {selectedRows.length} popzone{selectedRows.length !== 1 ? 's' : ''}
             </span>
           </div>
           <button
@@ -185,7 +213,6 @@ export function MailPresetDialog({ open, selectedRows, canEdit, userName, onClos
 
         {/* Controls */}
         <div className="px-5 pt-4 pb-3 flex items-center gap-3 flex-shrink-0 flex-wrap">
-          {/* Language */}
           <div className="flex gap-0.5 p-1 bg-neutral-100 dark:bg-[#222] rounded-lg">
             {(['EN', 'NL', 'FR'] as Lang[]).map((l) => (
               <button
@@ -203,7 +230,6 @@ export function MailPresetDialog({ open, selectedRows, canEdit, userName, onClos
             ))}
           </div>
 
-          {/* Type */}
           <div className="flex gap-0.5 p-1 bg-neutral-100 dark:bg-[#222] rounded-lg">
             {([['first_time', 'First Time'], ['reminder', 'Reminder']] as [MailType, string][]).map(([t, label]) => (
               <button
@@ -224,34 +250,34 @@ export function MailPresetDialog({ open, selectedRows, canEdit, userName, onClos
           </div>
         </div>
 
-        {/* Textarea */}
-        <div className="px-5 pb-3 flex-1 overflow-hidden flex flex-col gap-3 min-h-0">
+        {/* Textarea + prompts */}
+        <div className="px-5 pb-3 flex-1 overflow-y-auto flex flex-col gap-3 min-h-0">
           <textarea
             value={mailText}
             onChange={(e) => setMailText(e.target.value)}
-            className="flex-1 min-h-[260px] w-full text-sm font-mono bg-neutral-50 dark:bg-[#111] border border-neutral-200 dark:border-white/10 rounded-lg px-3.5 py-3 text-neutral-800 dark:text-neutral-200 resize-none outline-none focus:border-blue-400 dark:focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all leading-relaxed"
+            className="flex-shrink-0 min-h-[260px] w-full text-sm font-mono bg-neutral-50 dark:bg-[#111] border border-neutral-200 dark:border-white/10 rounded-lg px-3.5 py-3 text-neutral-800 dark:text-neutral-200 resize-none outline-none focus:border-blue-400 dark:focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all leading-relaxed"
           />
 
-          {/* Status update confirm */}
-          {showConfirm && !updated && (
+          {/* Status update prompt — non-OSC_UPDATED rows */}
+          {showStatusConfirm && !statusUpdated && (
             <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800/50 rounded-lg px-4 py-3 flex-shrink-0">
               <p className="text-xs text-blue-800 dark:text-blue-300 mb-2.5">
-                Update status to{' '}
-                <span className="font-semibold">&quot;{targetStatus}&quot;</span> for {count} popzone
-                {count !== 1 ? 's' : ''}?
+                Update status to <span className="font-semibold">&quot;{targetStatus}&quot;</span> for{' '}
+                <span className="font-semibold tabular-nums">{nonUpdatedRows.length}</span> popzone
+                {nonUpdatedRows.length !== 1 ? 's' : ''}?
                 <span className="ml-1 opacity-70">(Mail Sent date will be set to today)</span>
               </p>
               <div className="flex gap-2">
                 <button
                   onClick={handleUpdateStatus}
-                  disabled={updating}
+                  disabled={statusUpdating}
                   className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded-md transition-colors disabled:opacity-60"
                 >
-                  {updating ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
+                  {statusUpdating ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
                   Yes, update
                 </button>
                 <button
-                  onClick={() => setShowConfirm(false)}
+                  onClick={() => setShowStatusConfirm(false)}
                   className="px-3 py-1.5 text-xs text-neutral-500 dark:text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-300 transition-colors"
                 >
                   Skip
@@ -260,10 +286,52 @@ export function MailPresetDialog({ open, selectedRows, canEdit, userName, onClos
             </div>
           )}
 
-          {updated && (
+          {statusUpdated && (
             <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 text-xs flex-shrink-0">
               <Check className="w-3.5 h-3.5" />
-              Status updated to &quot;{targetStatus}&quot; for {count} popzone{count !== 1 ? 's' : ''}
+              Status updated to &quot;{targetStatus}&quot; for {nonUpdatedRows.length} popzone{nonUpdatedRows.length !== 1 ? 's' : ''}
+            </div>
+          )}
+
+          {/* Remark prompt — OSC_UPDATED rows */}
+          {showRemarkPrompt && !remarkUpdated && (
+            <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/40 rounded-lg px-4 py-3 flex-shrink-0">
+              <p className="text-xs text-amber-800 dark:text-amber-300 mb-2.5">
+                <span className="font-semibold tabular-nums">{oscUpdatedRows.length}</span> popzone
+                {oscUpdatedRows.length !== 1 ? 's are' : ' is'} already{' '}
+                <span className="font-semibold">OSC Updated</span>. Add a remark to{' '}
+                {oscUpdatedRows.length !== 1 ? 'them' : 'it'}?
+              </p>
+              <textarea
+                value={remark}
+                onChange={(e) => setRemark(e.target.value)}
+                placeholder="Enter remark…"
+                rows={2}
+                className="w-full text-xs bg-white dark:bg-[#1a1a1a] border border-amber-200 dark:border-amber-800/40 rounded-md px-3 py-2 text-neutral-800 dark:text-neutral-200 placeholder-neutral-400 dark:placeholder-neutral-600 resize-none outline-none focus:border-amber-400 dark:focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 transition-all mb-2.5"
+              />
+              <div className="flex gap-2">
+                <button
+                  onClick={handleUpdateRemark}
+                  disabled={remarkUpdating || remark.trim() === ''}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-medium rounded-md transition-colors disabled:opacity-60"
+                >
+                  {remarkUpdating ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
+                  Apply remark
+                </button>
+                <button
+                  onClick={() => setShowRemarkPrompt(false)}
+                  className="px-3 py-1.5 text-xs text-neutral-500 dark:text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-300 transition-colors"
+                >
+                  Skip
+                </button>
+              </div>
+            </div>
+          )}
+
+          {remarkUpdated && (
+            <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 text-xs flex-shrink-0">
+              <Check className="w-3.5 h-3.5" />
+              Remark updated for {oscUpdatedRows.length} OSC Updated popzone{oscUpdatedRows.length !== 1 ? 's' : ''}
             </div>
           )}
         </div>
