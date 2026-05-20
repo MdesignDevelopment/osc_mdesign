@@ -3,6 +3,29 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    --background: 0 0% 98%;
+    --foreground: 0 0% 9%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 9%;
+    --muted: 0 0% 96%;
+    --muted-foreground: 0 0% 45%;
+    --border: 0 0% 90%;
+    --input: 0 0% 90%;
+    --ring: 221.2 83.2% 53.3%;
+    --radius: 0.5rem;
+    --primary: 221.2 83.2% 53.3%;
+    --primary-foreground: 0 0% 98%;
+    --secondary: 0 0% 96%;
+    --secondary-foreground: 0 0% 9%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    --accent: 0 0% 96%;
+    --accent-foreground: 0 0% 9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 9%;
+  }
+
   * {
     box-sizing: border-box;
   }
@@ -12,66 +35,187 @@
   }
 
   body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto, sans-serif;
-    background-color: #F8FAFC;
-    color: #0F172A;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background-color: #f9fafb;
+    color: #171717;
     line-height: 1.5;
     -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    body {
+      background-color: #0a0a0a;
+      color: #ededed;
+    }
   }
 }
 
 @layer components {
   /* Panel / card */
-  .jira-panel {
-    @apply bg-white rounded-xl border border-slate-100 shadow-sm;
+  .panel {
+    @apply rounded-lg border;
+    background-color: #ffffff;
+    border-color: #e5e5e5;
   }
 
-  /* Section header (e.g. "Description", "Activity") */
+  .jira-panel {
+    @apply rounded-lg border;
+    background-color: #ffffff;
+    border-color: #e5e5e5;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    .panel,
+    .jira-panel {
+      background-color: #111111;
+      border-color: rgba(255, 255, 255, 0.08);
+    }
+  }
+
+  /* Section header */
   .jira-section-header {
-    @apply text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2;
+    @apply text-[11px] font-semibold uppercase tracking-wider mb-2;
+    color: #a3a3a3;
   }
 
   /* Form field label */
   .jira-field-label {
-    @apply text-xs font-medium text-slate-500 mb-1;
+    @apply text-xs font-medium mb-1;
+    color: #737373;
   }
 
   .jira-field-value {
-    @apply text-sm text-slate-900;
+    @apply text-sm;
+    color: #171717;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    .jira-field-value {
+      color: #ededed;
+    }
   }
 
   /* Input */
   .jira-input {
-    @apply w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm
-           text-slate-900 placeholder-slate-400 outline-none transition
-           hover:border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20;
+    @apply w-full px-3 py-2 rounded-md text-sm outline-none transition-all;
+    background-color: #ffffff;
+    border: 1px solid #e5e5e5;
+    color: #171717;
+  }
+
+  .jira-input::placeholder {
+    color: #a3a3a3;
+  }
+
+  .jira-input:hover {
+    border-color: #d4d4d4;
+  }
+
+  .jira-input:focus {
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    .jira-input {
+      background-color: #1a1a1a;
+      border-color: rgba(255, 255, 255, 0.1);
+      color: #ededed;
+    }
+
+    .jira-input::placeholder {
+      color: #525252;
+    }
+
+    .jira-input:hover {
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+
+    .jira-input:focus {
+      border-color: #3b82f6;
+      box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3);
+    }
   }
 
   /* Primary button */
   .jira-btn-primary {
-    @apply inline-flex items-center gap-1.5 px-3.5 py-2 bg-blue-600 hover:bg-blue-700
-           text-white text-sm font-medium rounded-lg transition-colors
-           disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply inline-flex items-center gap-1.5 px-3.5 py-2 text-sm font-medium rounded-md transition-colors;
+    @apply disabled:opacity-50 disabled:cursor-not-allowed;
+    background-color: #2563eb;
+    color: #ffffff;
+  }
+
+  .jira-btn-primary:hover:not(:disabled) {
+    background-color: #1d4ed8;
   }
 
   /* Secondary button */
   .jira-btn-secondary {
-    @apply inline-flex items-center gap-1.5 px-3.5 py-2 bg-white hover:bg-slate-50
-           text-slate-600 text-sm font-medium border border-slate-200 rounded-lg
-           transition-colors;
+    @apply inline-flex items-center gap-1.5 px-3.5 py-2 text-sm font-medium rounded-md transition-colors;
+    background-color: #ffffff;
+    color: #525252;
+    border: 1px solid #e5e5e5;
   }
 
-  /* Table */
+  .jira-btn-secondary:hover {
+    background-color: #f5f5f5;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    .jira-btn-secondary {
+      background-color: #1a1a1a;
+      color: #a3a3a3;
+      border-color: rgba(255, 255, 255, 0.1);
+    }
+
+    .jira-btn-secondary:hover {
+      background-color: rgba(255, 255, 255, 0.05);
+    }
+  }
+
+  /* Table header */
   .jira-table-header {
-    @apply text-xs font-medium text-slate-500 uppercase tracking-wide px-4 py-3
-           bg-slate-50 text-left whitespace-nowrap;
+    @apply text-[11px] font-medium uppercase tracking-wide px-4 py-3 text-left whitespace-nowrap;
+    background-color: #fafafa;
+    color: #737373;
   }
 
+  @media (prefers-color-scheme: dark) {
+    .jira-table-header {
+      background-color: rgba(255, 255, 255, 0.03);
+      color: #737373;
+    }
+  }
+
+  /* Table cell */
   .jira-table-cell {
-    @apply text-sm text-slate-800 px-4 py-3;
+    @apply text-sm px-4 py-3;
+    color: #262626;
   }
 
+  @media (prefers-color-scheme: dark) {
+    .jira-table-cell {
+      color: #e5e5e5;
+    }
+  }
+
+  /* Table row */
   .jira-table-row {
-    @apply border-b border-slate-50 hover:bg-slate-50/60 transition-colors;
+    border-bottom: 1px solid #f5f5f5;
+  }
+
+  .jira-table-row:hover {
+    background-color: rgba(0, 0, 0, 0.02);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    .jira-table-row {
+      border-bottom-color: rgba(255, 255, 255, 0.04);
+    }
+
+    .jira-table-row:hover {
+      background-color: rgba(255, 255, 255, 0.03);
+    }
   }
 }
