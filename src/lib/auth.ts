@@ -63,7 +63,7 @@ export const authOptions: NextAuthOptions = {
           where: { id: token.id as string },
           select: { role: true, active: true },
         })
-        if (!dbUser || !dbUser.active) return null
+        if (!dbUser || !dbUser.active) return null as any
         token.role = dbUser.role
       }
       return token
