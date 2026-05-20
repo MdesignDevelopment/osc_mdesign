@@ -1,7 +1,14 @@
 import { prisma } from '@/lib/db'
+import { getSession } from '@/lib/auth'
+import { redirect } from 'next/navigation'
+import { unstable_noStore as noStore } from 'next/cache'
 import { UsersTable } from '@/components/users/users-table'
 
 export default async function UsersPage() {
+  noStore()
+  const session = await getSession()
+  if (!session || session.user.role !== 'ADMIN') redirect('/dashboard')
+
   const users = await prisma.user.findMany({
     orderBy: [{ role: 'asc' }, { name: 'asc' }],
     select: {

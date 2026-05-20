@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/db'
 import { getSession } from '@/lib/auth'
 import { redirect, notFound } from 'next/navigation'
+import { unstable_noStore as noStore } from 'next/cache'
 import { OscTimeline } from '@/components/osc/osc-timeline'
 import Link from 'next/link'
 import { Pencil, ChevronRight } from 'lucide-react'
@@ -9,6 +10,7 @@ import { StatusLozenge, PriorityLozenge } from '@/components/ui/lozenge'
 import { OscStatus, Priority } from '@prisma/client'
 
 export default async function OscDetailPage({ params }: { params: { id: string } }) {
+  noStore()
   const session = await getSession()
   if (!session) redirect('/login')
 

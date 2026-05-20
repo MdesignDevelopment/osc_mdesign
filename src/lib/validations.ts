@@ -24,14 +24,14 @@ export const commentSchema = z.object({
 export const userCreateSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters'),
   email: z.string().email('Invalid email address'),
-  password: z.string().min(6, 'Password must be at least 6 characters'),
+  password: z.string().min(12, 'Password must be at least 12 characters'),
   role: z.enum(['ADMIN', 'SUPPORT_ENGINEER', 'EXTERN']),
 })
 
 export const userUpdateSchema = z.object({
   name: z.string().min(2).optional(),
   email: z.string().email().optional(),
-  password: z.string().min(6).optional().nullable(),
+  password: z.string().min(12, 'Password must be at least 12 characters').optional().nullable(),
   role: z.enum(['ADMIN', 'SUPPORT_ENGINEER', 'EXTERN']).optional(),
   active: z.boolean().optional(),
 })

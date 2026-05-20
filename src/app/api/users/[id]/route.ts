@@ -22,7 +22,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
   const updateData: Record<string, unknown> = { ...rest }
 
   if (password) {
-    updateData.password = await bcrypt.hash(password, 10)
+    updateData.password = await bcrypt.hash(password, 12)
   }
 
   const updated = await prisma.user.update({

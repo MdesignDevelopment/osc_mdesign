@@ -10,6 +10,17 @@ export const authOptions: NextAuthOptions = {
     signIn: '/login',
     error: '/login',
   },
+  cookies: {
+    sessionToken: {
+      name: process.env.NODE_ENV === 'production' ? '__Secure-next-auth.session-token' : 'next-auth.session-token',
+      options: {
+        httpOnly: true,
+        sameSite: 'strict',
+        path: '/',
+        secure: process.env.NODE_ENV === 'production',
+      },
+    },
+  },
   providers: [
     CredentialsProvider({
       name: 'credentials',
@@ -24,7 +35,8 @@ export const authOptions: NextAuthOptions = {
           where: { email: credentials.email },
         })
 
-        if (!user || !user.active) return null
+        if (!user) return null
+        if (!user.active) return null
 
         const passwordMatch = await bcrypt.compare(credentials.password, user.password)
         if (!passwordMatch) return null
@@ -43,6 +55,16 @@ export const authOptions: NextAuthOptions = {
       if (user) {
         token.role = (user as { role: Role }).role
         token.id = user.id
+        return token
+      }
+      // Re-validate on every token refresh
+      if (token.id) {
+        const dbUser = await prisma.user.findUnique({
+          where: { id: token.id as string },
+          select: { role: true, active: true },
+        })
+        if (!dbUser || !dbUser.active) return null
+        token.role = dbUser.role
       }
       return token
     },
