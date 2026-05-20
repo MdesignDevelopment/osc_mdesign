@@ -24,7 +24,9 @@ enum OscStatus {
 
 enum Priority {
   HIGH_PRIO
+  MEDIUM_PRIO
   LOW_PRIO
+  NOT_DEFINED
 }
 
 model User {

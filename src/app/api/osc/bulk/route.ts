@@ -17,8 +17,12 @@ const STATUS_MAP: Record<string, OscStatus> = {
 const PRIORITY_MAP: Record<string, Priority> = {
   'high priority': 'HIGH_PRIO',
   'high': 'HIGH_PRIO',
+  'medium priority': 'MEDIUM_PRIO',
+  'medium': 'MEDIUM_PRIO',
   'low priority': 'LOW_PRIO',
   'low': 'LOW_PRIO',
+  'not defined': 'NOT_DEFINED',
+  '': 'NOT_DEFINED',
 }
 
 function parseDate(val: unknown): Date | null {
@@ -113,7 +117,7 @@ export async function POST(req: NextRequest) {
       continue
     }
 
-    const priority = priorityRaw ? (PRIORITY_MAP[priorityRaw] ?? null) : null
+    const priority = PRIORITY_MAP[priorityRaw] ?? 'NOT_DEFINED'
 
     toCreate.push({
       partnerId,
