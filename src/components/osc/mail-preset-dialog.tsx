@@ -119,11 +119,11 @@ export function MailPresetDialog({ open, selectedRows, canEdit, userName, onClos
   const [statusUpdating, setStatusUpdating] = useState(false)
   const [statusUpdated, setStatusUpdated] = useState(false)
 
-  // Remark prompt (OSC_UPDATED rows)
-  const [showRemarkPrompt, setShowRemarkPrompt] = useState(false)
-  const [remark, setRemark] = useState('')
-  const [remarkUpdating, setRemarkUpdating] = useState(false)
-  const [remarkUpdated, setRemarkUpdated] = useState(false)
+  // Comment prompt (OSC_UPDATED rows)
+  const [showCommentPrompt, setShowCommentPrompt] = useState(false)
+  const [comment, setComment] = useState('')
+  const [commentAdding, setCommentAdding] = useState(false)
+  const [commentAdded, setCommentAdded] = useState(false)
 
   const nonUpdatedRows = selectedRows.filter((r) => r.status !== 'OSC_UPDATED')
   const oscUpdatedRows = selectedRows.filter((r) => r.status === 'OSC_UPDATED')
@@ -134,10 +134,10 @@ export function MailPresetDialog({ open, selectedRows, canEdit, userName, onClos
     if (open) {
       setCopied(false)
       setShowStatusConfirm(false)
-      setShowRemarkPrompt(false)
+      setShowCommentPrompt(false)
       setStatusUpdated(false)
-      setRemarkUpdated(false)
-      setRemark('')
+      setCommentAdded(false)
+      setComment('')
     }
   }, [open])
 
@@ -145,7 +145,7 @@ export function MailPresetDialog({ open, selectedRows, canEdit, userName, onClos
     reset()
     setCopied(false)
     setShowStatusConfirm(false)
-    setShowRemarkPrompt(false)
+    setShowCommentPrompt(false)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lang, mailType, selectedRows])
 
@@ -154,7 +154,7 @@ export function MailPresetDialog({ open, selectedRows, canEdit, userName, onClos
     setCopied(true)
     if (canEdit) {
       if (nonUpdatedRows.length > 0) setShowStatusConfirm(true)
-      if (oscUpdatedRows.length > 0) setShowRemarkPrompt(true)
+      if (oscUpdatedRows.length > 0) setShowCommentPrompt(true)
     }
   }
 
@@ -172,16 +172,16 @@ export function MailPresetDialog({ open, selectedRows, canEdit, userName, onClos
     onRefresh()
   }
 
-  const handleUpdateRemark = async () => {
-    setRemarkUpdating(true)
-    await fetch('/api/osc/bulk-status', {
+  const handleAddComment = async () => {
+    setCommentAdding(true)
+    await fetch('/api/osc/bulk-comments', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ids: oscUpdatedRows.map((r) => r.id), remark }),
+      body: JSON.stringify({ ids: oscUpdatedRows.map((r) => r.id), comment }),
     })
-    setRemarkUpdating(false)
-    setRemarkUpdated(true)
-    setShowRemarkPrompt(false)
+    setCommentAdding(false)
+    setCommentAdded(true)
+    setShowCommentPrompt(false)
     onRefresh()
   }
 
@@ -293,33 +293,33 @@ export function MailPresetDialog({ open, selectedRows, canEdit, userName, onClos
             </div>
           )}
 
-          {/* Remark prompt — OSC_UPDATED rows */}
-          {showRemarkPrompt && !remarkUpdated && (
+          {/* Comment prompt — OSC_UPDATED rows */}
+          {showCommentPrompt && !commentAdded && (
             <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/40 rounded-lg px-4 py-3 flex-shrink-0">
               <p className="text-xs text-amber-800 dark:text-amber-300 mb-2.5">
                 <span className="font-semibold tabular-nums">{oscUpdatedRows.length}</span> popzone
                 {oscUpdatedRows.length !== 1 ? 's are' : ' is'} already{' '}
-                <span className="font-semibold">OSC Updated</span>. Add a remark to{' '}
+                <span className="font-semibold">OSC Updated</span>. Add a comment to{' '}
                 {oscUpdatedRows.length !== 1 ? 'them' : 'it'}?
               </p>
               <textarea
-                value={remark}
-                onChange={(e) => setRemark(e.target.value)}
-                placeholder="Enter remark…"
+                value={comment}
+                onChange={(e) => setComment(e.target.value)}
+                placeholder="Enter comment…"
                 rows={2}
                 className="w-full text-xs bg-white dark:bg-[#1a1a1a] border border-amber-200 dark:border-amber-800/40 rounded-md px-3 py-2 text-neutral-800 dark:text-neutral-200 placeholder-neutral-400 dark:placeholder-neutral-600 resize-none outline-none focus:border-amber-400 dark:focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 transition-all mb-2.5"
               />
               <div className="flex gap-2">
                 <button
-                  onClick={handleUpdateRemark}
-                  disabled={remarkUpdating || remark.trim() === ''}
+                  onClick={handleAddComment}
+                  disabled={commentAdding || comment.trim() === ''}
                   className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-medium rounded-md transition-colors disabled:opacity-60"
                 >
-                  {remarkUpdating ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
-                  Apply remark
+                  {commentAdding ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
+                  Add comment
                 </button>
                 <button
-                  onClick={() => setShowRemarkPrompt(false)}
+                  onClick={() => setShowCommentPrompt(false)}
                   className="px-3 py-1.5 text-xs text-neutral-500 dark:text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-300 transition-colors"
                 >
                   Skip
@@ -328,10 +328,10 @@ export function MailPresetDialog({ open, selectedRows, canEdit, userName, onClos
             </div>
           )}
 
-          {remarkUpdated && (
+          {commentAdded && (
             <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 text-xs flex-shrink-0">
               <Check className="w-3.5 h-3.5" />
-              Remark updated for {oscUpdatedRows.length} OSC Updated popzone{oscUpdatedRows.length !== 1 ? 's' : ''}
+              Comment added to {oscUpdatedRows.length} OSC Updated popzone{oscUpdatedRows.length !== 1 ? 's' : ''}
             </div>
           )}
         </div>
