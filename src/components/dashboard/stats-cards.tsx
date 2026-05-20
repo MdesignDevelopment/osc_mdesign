@@ -188,7 +188,7 @@ export function StatsCards(props: StatsCardsProps) {
           unit="days"
           icon={CalendarDays}
           iconClass="bg-teal-100 dark:bg-teal-950/50 text-teal-600 dark:text-teal-400"
-          description="From received to mail sent"
+          description="From mail sent to received"
         />
       </div>
     </div>

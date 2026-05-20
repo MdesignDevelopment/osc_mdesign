@@ -2,6 +2,29 @@
 @tailwind components;
 @tailwind utilities;
 
+@media print {
+  @page {
+    size: A4 landscape;
+    margin: 1.5cm;
+  }
+
+  .no-print { display: none !important; }
+
+  aside, header { display: none !important; }
+
+  main {
+    padding: 0 !important;
+    overflow: visible !important;
+  }
+
+  body {
+    background: #ffffff !important;
+    color: #171717 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}
+
 @layer base {
   :root {
     --background: 0 0% 98%;

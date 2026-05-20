@@ -9,6 +9,7 @@ import { PartnerChart } from '@/components/dashboard/partner-chart'
 import { MailTrendChart } from '@/components/dashboard/mail-trend-chart'
 import { RecentRequests } from '@/components/dashboard/recent-requests'
 import { RecentFilters } from '@/components/dashboard/recent-filters'
+import { ExportPdfButton } from '@/components/dashboard/export-pdf-button'
 
 interface DashboardPageProps {
   searchParams: {
@@ -166,6 +167,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
           <h1 className="text-xl font-semibold text-neutral-900 dark:text-neutral-100">Dashboard</h1>
           <p className="text-sm text-neutral-400 dark:text-neutral-500 mt-0.5">{today}</p>
         </div>
+        <ExportPdfButton />
       </div>
 
 
@@ -198,12 +200,14 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
 
       {/* Recent requests */}
       <div className="space-y-3">
-        <RecentFilters
-          partners={allPartners}
-          currentSearch={searchParams.search ?? ''}
-          currentPartner={searchParams.partner ?? ''}
-          currentTimeframe={searchParams.timeframe ?? ''}
-        />
+        <div className="no-print">
+          <RecentFilters
+            partners={allPartners}
+            currentSearch={searchParams.search ?? ''}
+            currentPartner={searchParams.partner ?? ''}
+            currentTimeframe={searchParams.timeframe ?? ''}
+          />
+        </div>
         <RecentRequests requests={recent} />
       </div>
     </div>
