@@ -7,7 +7,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string; 
   const session = await getSession()
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const comment = await prisma.oscComment.findUnique({ where: { id: params.commentId } })
+  const comment = await prisma.oscComment.findUnique({ where: { id: params.commentId, oscRequestId: params.id } })
   if (!comment) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
   if (comment.userId !== session.user.id) {

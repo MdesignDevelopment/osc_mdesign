@@ -75,12 +75,24 @@ export async function POST(req: NextRequest) {
   const file = formData.get('file') as File | null
   if (!file) return NextResponse.json({ error: 'No file provided' }, { status: 400 })
 
+  if (file.size > 5 * 1024 * 1024) {
+    return NextResponse.json({ error: 'File too large. Maximum 5MB.' }, { status: 400 })
+  }
+  const allowedTypes = [
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'application/vnd.ms-excel',
+  ]
+  if (!allowedTypes.includes(file.type)) {
+    return NextResponse.json({ error: 'Invalid file type. Upload an XLSX file.' }, { status: 400 })
+  }
+
   const buffer = Buffer.from(await file.arrayBuffer())
   const wb = XLSX.read(buffer, { type: 'buffer', cellDates: true })
   const ws = wb.Sheets[wb.SheetNames[0]]
   const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: '' })
 
   if (rows.length === 0) return NextResponse.json({ error: 'File is empty or has no data rows' }, { status: 400 })
+  if (rows.length > 1000) return NextResponse.json({ error: 'Too many rows. Maximum 1000 rows per import.' }, { status: 400 })
 
   const partners = await prisma.partner.findMany()
   const partnerMap = new Map(partners.map((p) => [p.name.toLowerCase().trim(), p.id]))

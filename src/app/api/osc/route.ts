@@ -11,12 +11,21 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
   const page = Math.max(1, parseInt(searchParams.get('page') ?? '1'))
   const limit = Math.min(100, parseInt(searchParams.get('limit') ?? '25'))
-  const status = searchParams.get('status') as OscStatus | null
+
+  const VALID_STATUSES = ['OSC_UPDATED', 'EMAIL_SENT', 'EMAIL_SENT_REMINDER', 'ON_HOLD', 'CHECK_REMARKS'] as const
+  const rawStatus = searchParams.get('status')
+  const status = rawStatus && (VALID_STATUSES as readonly string[]).includes(rawStatus) ? rawStatus as OscStatus : null
+
+  const VALID_PRIORITIES = ['HIGH_PRIO', 'MEDIUM_PRIO', 'LOW_PRIO', 'NOT_DEFINED'] as const
+  const rawPriority = searchParams.get('priority')
+  const priority = rawPriority && (VALID_PRIORITIES as readonly string[]).includes(rawPriority) ? rawPriority : null
+
   const partner = searchParams.get('partner')
   const search = searchParams.get('search')
 
   const where: Prisma.OscRequestWhereInput = {
     ...(status && { status }),
+    ...(priority && { priority: priority as import('@prisma/client').Priority }),
     ...(partner && { partnerId: partner }),
     ...(search && {
       OR: [

@@ -27,7 +27,6 @@ function fmt(date: Date | null | undefined): string {
 export async function GET() {
   const session = await getSession()
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
   const requests = await prisma.oscRequest.findMany({
     orderBy: [
       { priority: { sort: 'asc', nulls: 'last' } },
@@ -80,6 +79,7 @@ export async function GET() {
     headers: {
       'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       'Content-Disposition': `attachment; filename="${filename}"`,
+      'X-Total-Exported': String(requests.length),
     },
   })
 }

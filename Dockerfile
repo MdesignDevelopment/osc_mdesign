@@ -15,7 +15,6 @@ COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
 # Prisma requires a valid DATABASE_URL at build time for prisma generate
 ENV DATABASE_URL="postgresql://placeholder:placeholder@localhost:5432/placeholder"
-ENV NEXTAUTH_SECRET="build-time-secret-placeholder-32chars"
 ENV NEXTAUTH_URL="http://localhost:3000"
 RUN npx prisma generate
 RUN npm run build

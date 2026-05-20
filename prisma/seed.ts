@@ -45,8 +45,14 @@ function toDate(val: unknown): Date | null {
 async function main() {
   console.log('Seeding database...')
 
+  // Require admin password from environment
+  const adminSeedPassword = process.env.ADMIN_SEED_PASSWORD
+  if (!adminSeedPassword) {
+    throw new Error('ADMIN_SEED_PASSWORD env var is required')
+  }
+
   // Create admin user
-  const adminPassword = await bcrypt.hash('admin123', 10)
+  const adminPassword = await bcrypt.hash(adminSeedPassword, 12)
   const admin = await prisma.user.upsert({
     where: { email: 'admin@mdesign.ma' },
     update: {},
@@ -58,20 +64,6 @@ async function main() {
     },
   })
   console.log('Created admin:', admin.email)
-
-  // Create test admin user
-  const testAdminPassword = await bcrypt.hash('test123', 10)
-  const testAdmin = await prisma.user.upsert({
-    where: { email: 'test@mdesign.ma' },
-    update: {},
-    create: {
-      name: 'test',
-      email: 'test@mdesign.ma',
-      password: testAdminPassword,
-      role: Role.ADMIN,
-    },
-  })
-  console.log('Created admin:', testAdmin.email)
 
   // Seed partners
   const partnerMap: Record<string, string> = {}
@@ -85,8 +77,14 @@ async function main() {
   }
   console.log('Created partners:', Object.keys(partnerMap).length)
 
-  // Load Excel file
-  const xlsxPath = process.env.XLSX_PATH || path.join(__dirname, '../data/OSCs-update-status.xlsx')
+  // Load Excel file — validate path to prevent traversal
+  const rawPath = process.env.XLSX_PATH || path.join(__dirname, '../data/OSCs-update-status.xlsx')
+  const xlsxPath = path.resolve(rawPath)
+  const allowedBase = path.resolve('/app/data')
+  const cwdBase = path.resolve(process.cwd())
+  if (!xlsxPath.startsWith(allowedBase) && !xlsxPath.startsWith(cwdBase)) {
+    throw new Error(`Invalid XLSX_PATH: must be within /app/data or project directory`)
+  }
   let workbook: XLSX.WorkBook
   try {
     workbook = XLSX.readFile(xlsxPath)

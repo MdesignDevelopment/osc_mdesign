@@ -7,4 +7,7 @@ RUN npm install
 COPY . .
 RUN npx prisma generate
 
-CMD ["sh", "-c", "npx prisma db push --accept-data-loss && npx tsx prisma/seed.ts"]
+RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 nextjs
+USER nextjs
+
+CMD ["sh", "-c", "npx prisma db push"]
