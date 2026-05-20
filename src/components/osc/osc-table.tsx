@@ -25,6 +25,7 @@ interface OscTableProps {
   pageSize: number
   searchParams: Record<string, string | undefined>
   canEdit: boolean
+  currentUserName: string
 }
 
 const ALL_STATUSES: { value: OscStatus; label: string }[] = [
@@ -86,7 +87,7 @@ function SortableTh({
   )
 }
 
-export function OscTable({ requests, partners, total, page, pageSize, searchParams, canEdit }: OscTableProps) {
+export function OscTable({ requests, partners, total, page, pageSize, searchParams, canEdit, currentUserName }: OscTableProps) {
   const router = useRouter()
   const pathname = usePathname()
   const [, startTransition] = useTransition()
@@ -481,6 +482,7 @@ export function OscTable({ requests, partners, total, page, pageSize, searchPara
           oscRequestDate: r.oscRequestDate,
         }))}
         canEdit={canEdit}
+        userName={currentUserName}
         onClose={() => setMailPresetOpen(false)}
         onRefresh={() => startTransition(() => router.refresh())}
       />

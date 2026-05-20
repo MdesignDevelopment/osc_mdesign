@@ -117,6 +117,7 @@ export default async function OscListPage({ searchParams }: PageProps) {
         pageSize={PAGE_SIZE}
         searchParams={searchParams}
         canEdit={canCreate}
+        currentUserName={session.user.name ?? ''}
       />
     </div>
   )

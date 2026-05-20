@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react'
 import { X, Mail, Copy, Check, Loader2, RefreshCw } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { format } from 'date-fns'
 
 type Lang = 'EN' | 'NL' | 'FR'
 type MailType = 'first_time' | 'reminder'
@@ -39,14 +38,6 @@ function groupPopzones(popzones: string[]): string {
     .join('\n')
 }
 
-function getEarliestDate(rows: MailPresetRow[]): string {
-  const dates = rows
-    .map((r) => r.oscRequestDate)
-    .filter(Boolean)
-    .map((d) => new Date(d as Date))
-    .sort((a, b) => a.getTime() - b.getTime())
-  return dates.length > 0 ? format(dates[0], 'dd/MM/yyyy') : '[DATE]'
-}
 
 const LABELS: Record<Lang, {
   greeting: string
@@ -90,7 +81,7 @@ const LABELS: Record<Lang, {
   },
 }
 
-function buildMailText(rows: MailPresetRow[], lang: Lang, type: MailType): string {
+function buildMailText(rows: MailPresetRow[], lang: Lang, type: MailType, userName: string): string {
   const l = LABELS[lang]
   const intro = type === 'first_time' ? l.firstIntro : l.reminderIntro
 
@@ -99,26 +90,27 @@ function buildMailText(rows: MailPresetRow[], lang: Lang, type: MailType): strin
 
   const sections: string[] = []
   if (highRows.length > 0) {
-    const date = getEarliestDate(highRows)
-    sections.push(`${l.p1} - ${l.requiredBefore} ${date}:\n${groupPopzones(highRows.map((r) => r.popzone))}`)
+    sections.push(`${l.p1} - ${l.requiredBefore} [DATE]:\n${groupPopzones(highRows.map((r) => r.popzone))}`)
   }
   if (stdRows.length > 0) {
-    const date = getEarliestDate(stdRows)
-    sections.push(`${l.std} - ${l.requiredBefore} ${date}:\n${groupPopzones(stdRows.map((r) => r.popzone))}`)
+    sections.push(`${l.std} - ${l.requiredBefore} [DATE]:\n${groupPopzones(stdRows.map((r) => r.popzone))}`)
   }
 
-  return `${l.greeting}\n\n${intro}\n\n${sections.join('\n\n')}\n\n${l.footer}\n\n${l.sign}`
+  const sign = l.sign.replace('[Name]', userName).replace('[Naam]', userName).replace('[Nom]', userName)
+
+  return `${l.greeting}\n\n${intro}\n\n${sections.join('\n\n')}\n\n${l.footer}\n\n${sign}`
 }
 
 interface MailPresetDialogProps {
   open: boolean
   selectedRows: MailPresetRow[]
   canEdit: boolean
+  userName: string
   onClose: () => void
   onRefresh: () => void
 }
 
-export function MailPresetDialog({ open, selectedRows, canEdit, onClose, onRefresh }: MailPresetDialogProps) {
+export function MailPresetDialog({ open, selectedRows, canEdit, userName, onClose, onRefresh }: MailPresetDialogProps) {
   const [lang, setLang] = useState<Lang>('EN')
   const [mailType, setMailType] = useState<MailType>('first_time')
   const [mailText, setMailText] = useState('')
@@ -127,7 +119,7 @@ export function MailPresetDialog({ open, selectedRows, canEdit, onClose, onRefre
   const [updating, setUpdating] = useState(false)
   const [updated, setUpdated] = useState(false)
 
-  const reset = () => setMailText(buildMailText(selectedRows, lang, mailType))
+  const reset = () => setMailText(buildMailText(selectedRows, lang, mailType, userName))
 
   useEffect(() => {
     if (open) {
