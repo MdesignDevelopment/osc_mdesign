@@ -1,5 +1,13 @@
 const attempts = new Map<string, { count: number; resetAt: number }>()
 
+// Sweep expired entries every 30 minutes to prevent unbounded memory growth
+setInterval(() => {
+  const now = Date.now()
+  for (const [key, entry] of attempts) {
+    if (now > entry.resetAt) attempts.delete(key)
+  }
+}, 30 * 60 * 1000).unref()
+
 export function checkRateLimit(
   ip: string,
   maxAttempts = 10,

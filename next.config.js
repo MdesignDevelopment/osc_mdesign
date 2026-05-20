@@ -6,9 +6,15 @@ const nextConfig = {
   },
   experimental: {
     serverActions: {
-      allowedOrigins: process.env.NEXTAUTH_URL
-        ? [new URL(process.env.NEXTAUTH_URL).host]
-        : ['localhost:3000'],
+      allowedOrigins: (() => {
+        try {
+          return process.env.NEXTAUTH_URL
+            ? [new URL(process.env.NEXTAUTH_URL).host]
+            : ['localhost:3000']
+        } catch {
+          return ['localhost:3000']
+        }
+      })(),
     },
   },
   async headers() {
