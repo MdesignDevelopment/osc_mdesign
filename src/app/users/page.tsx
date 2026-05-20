@@ -28,7 +28,7 @@ export default async function UsersPage() {
         <h1 className="text-xl font-semibold text-gray-900">User Management</h1>
         <p className="text-sm text-gray-500 mt-0.5">{users.length} users</p>
       </div>
-      <UsersTable users={users} />
+      <UsersTable users={users} currentUserId={session.user.id} />
     </div>
   )
 }

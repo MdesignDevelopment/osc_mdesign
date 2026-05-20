@@ -20,6 +20,7 @@ interface UserRow {
 
 interface UsersTableProps {
   users: UserRow[]
+  currentUserId: string
 }
 
 function UserAvatar({ name }: { name: string }) {
@@ -31,7 +32,7 @@ function UserAvatar({ name }: { name: string }) {
   )
 }
 
-export function UsersTable({ users }: UsersTableProps) {
+export function UsersTable({ users, currentUserId }: UsersTableProps) {
   const router = useRouter()
   const [dialog, setDialog] = useState<{ open: boolean; user?: UserRow }>({ open: false })
   const [toggling, setToggling] = useState<string | null>(null)
@@ -100,27 +101,31 @@ export function UsersTable({ users }: UsersTableProps) {
                   <td className="jira-table-cell text-slate-600">{user._count.comments}</td>
                   <td className="jira-table-cell text-slate-400 whitespace-nowrap">{formatDate(user.createdAt)}</td>
                   <td className="jira-table-cell">
-                    <div className="flex items-center gap-1">
-                      <button
-                        onClick={() => setDialog({ open: true, user })}
-                        className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
-                        title="Edit user"
-                      >
-                        <Pencil className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        onClick={() => handleToggleActive(user)}
-                        disabled={toggling === user.id}
-                        className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 transition-colors"
-                        title={user.active ? 'Deactivate' : 'Activate'}
-                      >
-                        {toggling === user.id
-                          ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                          : user.active
-                            ? <ToggleRight className="w-3.5 h-3.5 text-emerald-500" />
-                            : <ToggleLeft className="w-3.5 h-3.5" />}
-                      </button>
-                    </div>
+                    {user.role === 'ADMIN' && user.id !== currentUserId ? (
+                      <div className="w-16" />
+                    ) : (
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => setDialog({ open: true, user })}
+                          className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
+                          title="Edit user"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => handleToggleActive(user)}
+                          disabled={toggling === user.id}
+                          className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 transition-colors"
+                          title={user.active ? 'Deactivate' : 'Activate'}
+                        >
+                          {toggling === user.id
+                            ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            : user.active
+                              ? <ToggleRight className="w-3.5 h-3.5 text-emerald-500" />
+                              : <ToggleLeft className="w-3.5 h-3.5" />}
+                        </button>
+                      </div>
+                    )}
                   </td>
                 </tr>
               ))}

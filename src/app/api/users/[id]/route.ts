@@ -12,6 +12,11 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
   const user = await prisma.user.findUnique({ where: { id: params.id } })
   if (!user) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
+  // Admins cannot update other admins' accounts
+  if (user.role === 'ADMIN' && user.id !== session.user.id) {
+    return NextResponse.json({ error: 'Cannot modify another admin account' }, { status: 403 })
+  }
+
   const body = await req.json()
   const parsed = userUpdateSchema.safeParse(body)
   if (!parsed.success) {
