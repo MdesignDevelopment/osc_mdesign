@@ -166,23 +166,23 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
       {/* Page header */}
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Dashboard</h1>
-          <p className="text-sm text-slate-400 mt-0.5">{today} · OSC requests overview</p>
+          <h1 className="text-xl font-semibold text-neutral-900 dark:text-neutral-100">Dashboard</h1>
+          <p className="text-sm text-neutral-400 dark:text-neutral-500 mt-0.5">{today}</p>
         </div>
       </div>
 
       {/* Attention banner */}
       {attentionCount > 0 && (
-        <div className="rounded-xl border border-amber-200 bg-amber-50/80 px-5 py-3.5 flex items-center justify-between gap-4">
+        <div className="rounded-lg border border-amber-200 dark:border-amber-900/50 bg-amber-50/80 dark:bg-amber-950/20 px-4 py-3 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center flex-shrink-0">
-              <AlertTriangle className="w-4 h-4 text-amber-600" />
+            <div className="w-7 h-7 rounded-md bg-amber-100 dark:bg-amber-900/50 flex items-center justify-center flex-shrink-0">
+              <AlertTriangle className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
             </div>
             <div>
-              <p className="text-sm font-semibold text-amber-900">
+              <p className="text-sm font-medium text-amber-900 dark:text-amber-300">
                 {attentionCount} request{attentionCount !== 1 ? 's' : ''} need attention
               </p>
-              <p className="text-xs text-amber-700 mt-0.5">
+              <p className="text-xs text-amber-700 dark:text-amber-500 mt-0.5">
                 {[
                   data.highPrio > 0 && `${data.highPrio} high priority`,
                   checkRemarks > 0 && `${checkRemarks} check remarks`,
@@ -194,7 +194,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
           </div>
           <Link
             href="/osc"
-            className="text-xs font-semibold text-amber-700 hover:text-amber-900 flex-shrink-0 whitespace-nowrap transition-colors"
+            className="text-xs font-medium text-amber-700 dark:text-amber-400 hover:text-amber-900 dark:hover:text-amber-300 flex-shrink-0 whitespace-nowrap transition-colors"
           >
             Review all →
           </Link>

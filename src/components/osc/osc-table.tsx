@@ -30,7 +30,7 @@ const ALL_STATUSES: { value: OscStatus; label: string }[] = [
 ]
 
 function SortIcon({ active, dir }: { active: boolean; dir: string }) {
-  if (!active) return <ArrowUpDown className="w-3 h-3 text-slate-300 group-hover:text-slate-400 transition-colors" />
+  if (!active) return <ArrowUpDown className="w-3 h-3 text-neutral-300 dark:text-neutral-600 group-hover:text-neutral-400 transition-colors" />
   if (dir === 'asc') return <ArrowUp className="w-3 h-3 text-blue-500" />
   return <ArrowDown className="w-3 h-3 text-blue-500" />
 }
@@ -55,7 +55,9 @@ function SortableTh({
     <th
       className={cn(
         'jira-table-header cursor-pointer select-none group transition-colors',
-        active ? 'bg-blue-50/60 text-blue-700' : 'hover:bg-slate-100',
+        active
+          ? 'bg-blue-50/60 dark:bg-blue-950/20 text-blue-600 dark:text-blue-400'
+          : 'hover:bg-neutral-100 dark:hover:bg-white/[0.05]',
         className,
       )}
       onClick={() => onSort(sortKey)}
@@ -139,17 +141,17 @@ export function OscTable({ requests, partners, total, page, pageSize, searchPara
   return (
     <div className="space-y-3">
       {/* Filter bar */}
-      <div className="jira-panel p-3">
+      <div className="bg-white dark:bg-[#111] rounded-lg border border-neutral-200 dark:border-white/8 p-3">
         <div className="flex flex-wrap gap-2 items-center">
-          <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-lg px-3 py-2 flex-1 min-w-[220px] hover:border-slate-300 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/20 transition">
-            <Search className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
+          <div className="flex items-center gap-2 bg-neutral-50 dark:bg-[#1a1a1a] border border-neutral-200 dark:border-white/10 rounded-md px-3 py-2 flex-1 min-w-[220px] hover:border-neutral-300 dark:hover:border-white/20 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/20 dark:focus-within:ring-blue-500/30 transition-all">
+            <Search className="w-3.5 h-3.5 text-neutral-400 flex-shrink-0" />
             <input
               ref={searchRef}
               type="text"
               placeholder="Search popzone, partner, remark..."
               defaultValue={searchParams.search ?? ''}
               onChange={(e) => setParam('search', e.target.value)}
-              className="flex-1 text-sm bg-transparent outline-none text-slate-900 placeholder-slate-400"
+              className="flex-1 text-sm bg-transparent outline-none text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 dark:placeholder-neutral-600"
             />
           </div>
 
@@ -194,41 +196,44 @@ export function OscTable({ requests, partners, total, page, pageSize, searchPara
       </div>
 
       {/* Table */}
-      <div className="jira-panel overflow-hidden">
+      <div className="bg-white dark:bg-[#111] rounded-lg border border-neutral-200 dark:border-white/8 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
-              <tr className="border-b border-slate-100">
-                <SortableTh label="PopZone"    sortKey="popzone"      {...sharedSortProps} />
-                <SortableTh label="Partner"    sortKey="partner"      {...sharedSortProps} />
-                <SortableTh label="Status"     sortKey="status"       {...sharedSortProps} />
-                <SortableTh label="Priority"   sortKey="priority"     {...sharedSortProps} />
-                <SortableTh label="Received"   sortKey="receivedDate" {...sharedSortProps} />
+              <tr className="border-b border-neutral-100 dark:border-white/5">
+                <SortableTh label="PopZone"     sortKey="popzone"       {...sharedSortProps} />
+                <SortableTh label="Partner"     sortKey="partner"       {...sharedSortProps} />
+                <SortableTh label="Status"      sortKey="status"        {...sharedSortProps} />
+                <SortableTh label="Priority"    sortKey="priority"      {...sharedSortProps} />
+                <SortableTh label="Received"    sortKey="receivedDate"  {...sharedSortProps} />
                 <SortableTh label="OSC Request" sortKey="oscRequestDate" {...sharedSortProps} />
-                <SortableTh label="Mail Sent"  sortKey="mailSentDate" {...sharedSortProps} />
-                <SortableTh label="Remark"     sortKey="remark"       {...sharedSortProps} className="max-w-[160px]" />
+                <SortableTh label="Mail Sent"   sortKey="mailSentDate"  {...sharedSortProps} />
+                <SortableTh label="Remark"      sortKey="remark"        {...sharedSortProps} className="max-w-[160px]" />
                 <th className="jira-table-header w-8" />
               </tr>
             </thead>
             <tbody>
               {requests.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="text-center py-12 text-slate-400 text-sm">
+                  <td colSpan={9} className="text-center py-12 text-neutral-400 dark:text-neutral-600 text-sm">
                     No OSC requests found
                   </td>
                 </tr>
               ) : (
                 requests.map((req) => (
-                  <tr key={req.id} className="jira-table-row">
+                  <tr
+                    key={req.id}
+                    className="border-b border-neutral-50 dark:border-white/[0.04] hover:bg-neutral-50/80 dark:hover:bg-white/[0.03] transition-colors"
+                  >
                     <td className="jira-table-cell whitespace-nowrap">
                       <Link
                         href={`/osc/${req.id}`}
-                        className="text-blue-600 hover:text-blue-700 font-medium hover:underline"
+                        className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium hover:underline"
                       >
                         {req.popzone}
                       </Link>
                     </td>
-                    <td className="jira-table-cell text-slate-600 whitespace-nowrap">
+                    <td className="jira-table-cell text-neutral-500 dark:text-neutral-400 whitespace-nowrap">
                       {req.partner.name}
                     </td>
                     <td className="jira-table-cell whitespace-nowrap">
@@ -237,23 +242,23 @@ export function OscTable({ requests, partners, total, page, pageSize, searchPara
                     <td className="jira-table-cell whitespace-nowrap">
                       <PriorityLozenge priority={req.priority as Priority} />
                     </td>
-                    <td className="jira-table-cell text-slate-500 whitespace-nowrap tabular-nums">
+                    <td className="jira-table-cell text-neutral-400 dark:text-neutral-500 whitespace-nowrap tabular-nums">
                       {formatDate(req.receivedDate)}
                     </td>
-                    <td className="jira-table-cell text-slate-500 whitespace-nowrap tabular-nums">
+                    <td className="jira-table-cell text-neutral-400 dark:text-neutral-500 whitespace-nowrap tabular-nums">
                       {formatDate(req.oscRequestDate)}
                     </td>
-                    <td className="jira-table-cell text-slate-500 whitespace-nowrap tabular-nums">
+                    <td className="jira-table-cell text-neutral-400 dark:text-neutral-500 whitespace-nowrap tabular-nums">
                       {formatDate(req.mailSentDate)}
                     </td>
-                    <td className="jira-table-cell text-slate-500 max-w-[160px]">
+                    <td className="jira-table-cell text-neutral-400 dark:text-neutral-500 max-w-[160px]">
                       <span className="truncate block">{req.remark || '—'}</span>
                     </td>
                     <td className="jira-table-cell">
                       {canEdit && (
                         <Link
                           href={`/osc/${req.id}/edit`}
-                          className="p-1.5 rounded-lg hover:bg-slate-100 inline-flex text-slate-400 hover:text-slate-600 transition-colors"
+                          className="p-1.5 rounded-md hover:bg-neutral-100 dark:hover:bg-white/8 inline-flex text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-300 transition-colors"
                         >
                           <Pencil className="w-3.5 h-3.5" />
                         </Link>
@@ -268,25 +273,25 @@ export function OscTable({ requests, partners, total, page, pageSize, searchPara
 
         {/* Pagination */}
         {total > 0 && (
-          <div className="flex items-center justify-between px-4 py-3 border-t border-slate-100 bg-slate-50/50">
-            <span className="text-xs text-slate-400">
-              Showing {start}–{end} of {total.toLocaleString()}
+          <div className="flex items-center justify-between px-4 py-3 border-t border-neutral-100 dark:border-white/5">
+            <span className="text-xs text-neutral-400 dark:text-neutral-600">
+              {start}–{end} of {total.toLocaleString()}
             </span>
             <div className="flex items-center gap-1">
               <button
                 onClick={() => setParam('page', String(page - 1))}
                 disabled={page === 1}
-                className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                className="p-1.5 rounded-md text-neutral-500 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-white/8 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
               >
                 <ChevronLeft className="w-4 h-4" />
               </button>
-              <span className="text-xs text-slate-500 px-2">
-                Page {page} of {totalPages}
+              <span className="text-xs text-neutral-500 dark:text-neutral-400 px-2 tabular-nums">
+                {page} / {totalPages}
               </span>
               <button
                 onClick={() => setParam('page', String(page + 1))}
                 disabled={page >= totalPages}
-                className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                className="p-1.5 rounded-md text-neutral-500 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-white/8 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
               >
                 <ChevronRight className="w-4 h-4" />
               </button>

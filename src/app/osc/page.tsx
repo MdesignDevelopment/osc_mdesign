@@ -3,7 +3,7 @@ import { getSession } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { OscTable } from '@/components/osc/osc-table'
 import Link from 'next/link'
-import { Plus } from 'lucide-react'
+import { Plus, Download } from 'lucide-react'
 import { OscStatus, Priority } from '@prisma/client'
 
 interface PageProps {
@@ -89,15 +89,24 @@ export default async function OscListPage({ searchParams }: PageProps) {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold text-[#172B4D]">OSC Requests</h1>
-          <p className="text-sm text-[#6B778C] mt-0.5">{total.toLocaleString()} records</p>
+          <h1 className="text-xl font-semibold text-neutral-900 dark:text-neutral-100">OSC Requests</h1>
+          <p className="text-sm text-neutral-400 dark:text-neutral-500 mt-0.5">{total.toLocaleString()} records</p>
         </div>
-        {canCreate && (
-          <Link href="/osc/new" className="jira-btn-primary">
-            <Plus className="w-4 h-4" />
-            Create request
-          </Link>
-        )}
+        <div className="flex items-center gap-2">
+          <a
+            href="/api/osc/export"
+            className="jira-btn-secondary"
+          >
+            <Download className="w-4 h-4" />
+            Export Excel
+          </a>
+          {canCreate && (
+            <Link href="/osc/new" className="jira-btn-primary">
+              <Plus className="w-4 h-4" />
+              Create request
+            </Link>
+          )}
+        </div>
       </div>
 
       <OscTable
