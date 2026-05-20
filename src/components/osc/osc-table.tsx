@@ -5,9 +5,15 @@ import { useRouter, usePathname } from 'next/navigation'
 import { OscRequest, Partner, OscStatus, Priority } from '@prisma/client'
 import { formatDate } from '@/lib/utils'
 import { StatusLozenge, PriorityLozenge } from '@/components/ui/lozenge'
-import { Search, ChevronLeft, ChevronRight, Pencil, X, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react'
-import { useCallback, useTransition, useRef } from 'react'
+import {
+  Search, ChevronLeft, ChevronRight, Pencil, X,
+  ArrowUp, ArrowDown, ArrowUpDown,
+  FileDown, Clipboard, Mail, Check,
+} from 'lucide-react'
+import { useCallback, useTransition, useRef, useState, useEffect } from 'react'
 import { cn } from '@/lib/utils'
+import { format } from 'date-fns'
+import { MailPresetDialog } from './mail-preset-dialog'
 
 type OscRow = OscRequest & { partner: Partner; createdBy: { name: string } }
 
@@ -29,6 +35,21 @@ const ALL_STATUSES: { value: OscStatus; label: string }[] = [
   { value: 'CHECK_REMARKS', label: 'Check Remarks' },
 ]
 
+const STATUS_LABELS: Record<string, string> = {
+  OSC_UPDATED: 'OSC Updated',
+  EMAIL_SENT: 'Email Sent',
+  EMAIL_SENT_REMINDER: 'Email + Reminder',
+  ON_HOLD: 'On Hold',
+  CHECK_REMARKS: 'Check Remarks',
+}
+
+const PRIORITY_LABELS: Record<string, string> = {
+  HIGH_PRIO: 'High Priority',
+  MEDIUM_PRIO: 'Medium Priority',
+  LOW_PRIO: 'Low Priority',
+  NOT_DEFINED: 'Not defined',
+}
+
 function SortIcon({ active, dir }: { active: boolean; dir: string }) {
   if (!active) return <ArrowUpDown className="w-3 h-3 text-neutral-300 dark:text-neutral-600 group-hover:text-neutral-400 transition-colors" />
   if (dir === 'asc') return <ArrowUp className="w-3 h-3 text-blue-500" />
@@ -36,12 +57,7 @@ function SortIcon({ active, dir }: { active: boolean; dir: string }) {
 }
 
 function SortableTh({
-  label,
-  sortKey,
-  currentSort,
-  currentDir,
-  onSort,
-  className,
+  label, sortKey, currentSort, currentDir, onSort, className,
 }: {
   label: string
   sortKey: string
@@ -75,9 +91,87 @@ export function OscTable({ requests, partners, total, page, pageSize, searchPara
   const pathname = usePathname()
   const [, startTransition] = useTransition()
   const searchRef = useRef<HTMLInputElement>(null)
+  const selectAllRef = useRef<HTMLInputElement>(null)
+
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [mailPresetOpen, setMailPresetOpen] = useState(false)
+  const [popzoneCopied, setPopzoneCopied] = useState(false)
 
   const currentSort = searchParams.sort ?? ''
   const currentDir = searchParams.dir ?? 'asc'
+
+  // Clear selection when page or filters change
+  useEffect(() => {
+    setSelectedIds(new Set())
+  }, [page, searchParams.search, searchParams.status, searchParams.partner, searchParams.priority, searchParams.sort])
+
+  // Sync indeterminate state on select-all checkbox
+  useEffect(() => {
+    if (!selectAllRef.current) return
+    const all = requests.length > 0 && selectedIds.size === requests.length
+    const some = selectedIds.size > 0 && selectedIds.size < requests.length
+    selectAllRef.current.indeterminate = some
+    selectAllRef.current.checked = all
+  }, [selectedIds, requests])
+
+  const toggleRow = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  const toggleAll = () => {
+    setSelectedIds(
+      selectedIds.size === requests.length ? new Set() : new Set(requests.map((r) => r.id)),
+    )
+  }
+
+  const handleExportSelected = async () => {
+    const XLSX = await import('xlsx')
+    const fmtDate = (d: Date | null | undefined) => (d ? format(new Date(d), 'dd/MM/yyyy') : '')
+    const selected = requests.filter((r) => selectedIds.has(r.id))
+    const rows = selected.map((r) => ({
+      'Pop Zone': r.popzone,
+      'Partner': r.partner.name,
+      'Status': STATUS_LABELS[r.status] ?? r.status,
+      'Priority': r.priority ? (PRIORITY_LABELS[r.priority] ?? r.priority) : '',
+      'Remark': r.remark ?? '',
+      'Received Date': fmtDate(r.receivedDate),
+      'OSC Request Date': fmtDate(r.oscRequestDate),
+      'Mail Sent Date': fmtDate(r.mailSentDate),
+      'Updated Date': fmtDate(r.updatedDate),
+    }))
+    const wb = XLSX.utils.book_new()
+    const ws = XLSX.utils.json_to_sheet(rows)
+    ws['!cols'] = [
+      { wch: 26 }, { wch: 22 }, { wch: 20 }, { wch: 16 },
+      { wch: 40 }, { wch: 16 }, { wch: 18 }, { wch: 16 }, { wch: 16 },
+    ]
+    XLSX.utils.book_append_sheet(wb, ws, 'OSC Requests')
+    const buffer = XLSX.write(wb, { type: 'array', bookType: 'xlsx' })
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `osc-export-${new Date().toISOString().slice(0, 10)}.xlsx`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  }
+
+  const handleCopyPopzones = async () => {
+    const text = requests
+      .filter((r) => selectedIds.has(r.id))
+      .map((r) => r.popzone)
+      .join('\n')
+    await navigator.clipboard.writeText(text)
+    setPopzoneCopied(true)
+    setTimeout(() => setPopzoneCopied(false), 2000)
+  }
 
   const buildParams = useCallback(
     (overrides: Record<string, string>) => {
@@ -96,9 +190,7 @@ export function OscTable({ requests, partners, total, page, pageSize, searchPara
 
   const setParam = useCallback(
     (key: string, value: string) => {
-      startTransition(() =>
-        router.push(`${pathname}?${buildParams({ [key]: value })}`)
-      )
+      startTransition(() => router.push(`${pathname}?${buildParams({ [key]: value })}`))
     },
     [router, pathname, buildParams],
   )
@@ -137,6 +229,9 @@ export function OscTable({ requests, partners, total, page, pageSize, searchPara
   const end = Math.min(page * pageSize, total)
 
   const sharedSortProps = { currentSort, currentDir, onSort: handleSort }
+
+  const selectedRows = requests.filter((r) => selectedIds.has(r.id))
+  const mailPresetRows = selectedRows.filter((r) => r.status !== 'OSC_UPDATED')
 
   return (
     <div className="space-y-3">
@@ -201,71 +296,98 @@ export function OscTable({ requests, partners, total, page, pageSize, searchPara
           <table className="w-full">
             <thead>
               <tr className="border-b border-neutral-100 dark:border-white/5">
-                <SortableTh label="PopZone"     sortKey="popzone"       {...sharedSortProps} />
-                <SortableTh label="Partner"     sortKey="partner"       {...sharedSortProps} />
-                <SortableTh label="Status"      sortKey="status"        {...sharedSortProps} />
-                <SortableTh label="Priority"    sortKey="priority"      {...sharedSortProps} />
-                <SortableTh label="Received"    sortKey="receivedDate"  {...sharedSortProps} />
+                <th className="jira-table-header w-10">
+                  <input
+                    ref={selectAllRef}
+                    type="checkbox"
+                    onChange={toggleAll}
+                    className="w-3.5 h-3.5 rounded border-neutral-300 dark:border-neutral-600 text-blue-600 cursor-pointer accent-blue-600"
+                    aria-label="Select all"
+                  />
+                </th>
+                <SortableTh label="PopZone"     sortKey="popzone"        {...sharedSortProps} />
+                <SortableTh label="Partner"     sortKey="partner"        {...sharedSortProps} />
+                <SortableTh label="Status"      sortKey="status"         {...sharedSortProps} />
+                <SortableTh label="Priority"    sortKey="priority"       {...sharedSortProps} />
+                <SortableTh label="Received"    sortKey="receivedDate"   {...sharedSortProps} />
                 <SortableTh label="OSC Request" sortKey="oscRequestDate" {...sharedSortProps} />
-                <SortableTh label="Mail Sent"   sortKey="mailSentDate"  {...sharedSortProps} />
-                <SortableTh label="Remark"      sortKey="remark"        {...sharedSortProps} className="max-w-[160px]" />
+                <SortableTh label="Mail Sent"   sortKey="mailSentDate"   {...sharedSortProps} />
+                <SortableTh label="Remark"      sortKey="remark"         {...sharedSortProps} className="max-w-[160px]" />
                 <th className="jira-table-header w-8" />
               </tr>
             </thead>
             <tbody>
               {requests.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="text-center py-12 text-neutral-400 dark:text-neutral-600 text-sm">
+                  <td colSpan={10} className="text-center py-12 text-neutral-400 dark:text-neutral-600 text-sm">
                     No OSC requests found
                   </td>
                 </tr>
               ) : (
-                requests.map((req) => (
-                  <tr
-                    key={req.id}
-                    className="border-b border-neutral-50 dark:border-white/[0.04] hover:bg-neutral-50/80 dark:hover:bg-white/[0.03] transition-colors"
-                  >
-                    <td className="jira-table-cell whitespace-nowrap">
-                      <Link
-                        href={`/osc/${req.id}`}
-                        className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium hover:underline"
-                      >
-                        {req.popzone}
-                      </Link>
-                    </td>
-                    <td className="jira-table-cell text-neutral-500 dark:text-neutral-400 whitespace-nowrap">
-                      {req.partner.name}
-                    </td>
-                    <td className="jira-table-cell whitespace-nowrap">
-                      <StatusLozenge status={req.status as OscStatus} />
-                    </td>
-                    <td className="jira-table-cell whitespace-nowrap">
-                      <PriorityLozenge priority={req.priority as Priority} />
-                    </td>
-                    <td className="jira-table-cell text-neutral-400 dark:text-neutral-500 whitespace-nowrap tabular-nums">
-                      {formatDate(req.receivedDate)}
-                    </td>
-                    <td className="jira-table-cell text-neutral-400 dark:text-neutral-500 whitespace-nowrap tabular-nums">
-                      {formatDate(req.oscRequestDate)}
-                    </td>
-                    <td className="jira-table-cell text-neutral-400 dark:text-neutral-500 whitespace-nowrap tabular-nums">
-                      {formatDate(req.mailSentDate)}
-                    </td>
-                    <td className="jira-table-cell text-neutral-400 dark:text-neutral-500 max-w-[160px]">
-                      <span className="truncate block">{req.remark || '—'}</span>
-                    </td>
-                    <td className="jira-table-cell">
-                      {canEdit && (
-                        <Link
-                          href={`/osc/${req.id}/edit`}
-                          className="p-1.5 rounded-md hover:bg-neutral-100 dark:hover:bg-white/8 inline-flex text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-300 transition-colors"
-                        >
-                          <Pencil className="w-3.5 h-3.5" />
-                        </Link>
+                requests.map((req) => {
+                  const selected = selectedIds.has(req.id)
+                  return (
+                    <tr
+                      key={req.id}
+                      className={cn(
+                        'border-b border-neutral-50 dark:border-white/[0.04] transition-colors',
+                        selected
+                          ? 'bg-blue-50/50 dark:bg-blue-950/10'
+                          : 'hover:bg-neutral-50/80 dark:hover:bg-white/[0.03]',
                       )}
-                    </td>
-                  </tr>
-                ))
+                    >
+                      <td className="jira-table-cell w-10">
+                        <input
+                          type="checkbox"
+                          checked={selected}
+                          onChange={() => toggleRow(req.id)}
+                          onClick={(e) => e.stopPropagation()}
+                          className="w-3.5 h-3.5 rounded border-neutral-300 dark:border-neutral-600 text-blue-600 cursor-pointer accent-blue-600"
+                          aria-label={`Select ${req.popzone}`}
+                        />
+                      </td>
+                      <td className="jira-table-cell whitespace-nowrap">
+                        <Link
+                          href={`/osc/${req.id}`}
+                          className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium hover:underline"
+                        >
+                          {req.popzone}
+                        </Link>
+                      </td>
+                      <td className="jira-table-cell text-neutral-500 dark:text-neutral-400 whitespace-nowrap">
+                        {req.partner.name}
+                      </td>
+                      <td className="jira-table-cell whitespace-nowrap">
+                        <StatusLozenge status={req.status as OscStatus} />
+                      </td>
+                      <td className="jira-table-cell whitespace-nowrap">
+                        <PriorityLozenge priority={req.priority as Priority} />
+                      </td>
+                      <td className="jira-table-cell text-neutral-400 dark:text-neutral-500 whitespace-nowrap tabular-nums">
+                        {formatDate(req.receivedDate)}
+                      </td>
+                      <td className="jira-table-cell text-neutral-400 dark:text-neutral-500 whitespace-nowrap tabular-nums">
+                        {formatDate(req.oscRequestDate)}
+                      </td>
+                      <td className="jira-table-cell text-neutral-400 dark:text-neutral-500 whitespace-nowrap tabular-nums">
+                        {formatDate(req.mailSentDate)}
+                      </td>
+                      <td className="jira-table-cell text-neutral-400 dark:text-neutral-500 max-w-[160px]">
+                        <span className="truncate block">{req.remark || '—'}</span>
+                      </td>
+                      <td className="jira-table-cell">
+                        {canEdit && (
+                          <Link
+                            href={`/osc/${req.id}/edit`}
+                            className="p-1.5 rounded-md hover:bg-neutral-100 dark:hover:bg-white/8 inline-flex text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-300 transition-colors"
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                          </Link>
+                        )}
+                      </td>
+                    </tr>
+                  )
+                })
               )}
             </tbody>
           </table>
@@ -299,6 +421,69 @@ export function OscTable({ requests, partners, total, page, pageSize, searchPara
           </div>
         )}
       </div>
+
+      {/* Floating selection bar */}
+      {selectedIds.size > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 flex items-center gap-1 bg-white dark:bg-[#1e1e1e] border border-neutral-200 dark:border-white/10 rounded-xl shadow-2xl shadow-black/10 dark:shadow-black/40 px-2 py-1.5">
+          <span className="text-xs font-semibold text-neutral-700 dark:text-neutral-300 px-2 py-1 tabular-nums">
+            {selectedIds.size} selected
+          </span>
+          <div className="w-px h-4 bg-neutral-200 dark:bg-white/10 mx-1" />
+          <button
+            onClick={handleExportSelected}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-white/8 rounded-lg transition-colors"
+          >
+            <FileDown className="w-3.5 h-3.5" />
+            Export Excel
+          </button>
+          <button
+            onClick={handleCopyPopzones}
+            className={cn(
+              'flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors',
+              popzoneCopied
+                ? 'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/20'
+                : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-white/8',
+            )}
+          >
+            {popzoneCopied ? <Check className="w-3.5 h-3.5" /> : <Clipboard className="w-3.5 h-3.5" />}
+            {popzoneCopied ? 'Copied!' : 'Copy PopZones'}
+          </button>
+          {mailPresetRows.length > 0 && (
+            <button
+              onClick={() => setMailPresetOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-white/8 rounded-lg transition-colors"
+            >
+              <Mail className="w-3.5 h-3.5" />
+              Mail Preset
+              {mailPresetRows.length < selectedIds.size && (
+                <span className="tabular-nums text-neutral-400 dark:text-neutral-500">({mailPresetRows.length})</span>
+              )}
+            </button>
+          )}
+          <div className="w-px h-4 bg-neutral-200 dark:bg-white/10 mx-1" />
+          <button
+            onClick={() => setSelectedIds(new Set())}
+            className="p-1.5 text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-white/8 rounded-lg transition-colors"
+            aria-label="Clear selection"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
+
+      {/* Mail preset dialog */}
+      <MailPresetDialog
+        open={mailPresetOpen}
+        selectedRows={mailPresetRows.map((r) => ({
+          id: r.id,
+          popzone: r.popzone,
+          priority: r.priority,
+          oscRequestDate: r.oscRequestDate,
+        }))}
+        canEdit={canEdit}
+        onClose={() => setMailPresetOpen(false)}
+        onRefresh={() => startTransition(() => router.refresh())}
+      />
     </div>
   )
 }
