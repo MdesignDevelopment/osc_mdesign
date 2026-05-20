@@ -59,13 +59,13 @@ export function Sidebar({ session, open, onClose }: SidebarProps) {
                 href={item.href}
                 onClick={onClose}
                 className={cn(
-                  'flex items-center gap-2.5 px-3 py-2 rounded-md text-sm transition-colors',
+                  'flex items-center gap-3 px-3 py-2.5 rounded-md text-[15px] transition-colors',
                   active
                     ? 'bg-white/10 text-white'
                     : 'text-white/40 hover:text-white/80 hover:bg-white/[0.06]'
                 )}
               >
-                <Icon className={cn('w-4 h-4 flex-shrink-0', active ? 'text-blue-400' : 'text-white/30')} />
+                <Icon className={cn('w-5 h-5 flex-shrink-0', active ? 'text-blue-400' : 'text-white/30')} />
                 {item.label}
               </Link>
             )

@@ -3,8 +3,6 @@ import { getSession } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { differenceInDays, subDays, format } from 'date-fns'
 import { OscStatus } from '@prisma/client'
-import Link from 'next/link'
-import { AlertTriangle } from 'lucide-react'
 import { StatsCards } from '@/components/dashboard/stats-cards'
 import { StatusChart } from '@/components/dashboard/status-chart'
 import { PartnerChart } from '@/components/dashboard/partner-chart'
@@ -159,7 +157,6 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
 
   const today = format(new Date(), 'EEEE, MMMM d')
   const checkRemarks = statusCounts['CHECK_REMARKS'] ?? 0
-  const attentionCount = data.highPrio + checkRemarks
 
   return (
     <div className="space-y-5">
@@ -171,43 +168,12 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
         </div>
       </div>
 
-      {/* Attention banner */}
-      {attentionCount > 0 && (
-        <div className="rounded-lg border border-amber-200 dark:border-amber-900/50 bg-amber-50/80 dark:bg-amber-950/20 px-4 py-3 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="w-7 h-7 rounded-md bg-amber-100 dark:bg-amber-900/50 flex items-center justify-center flex-shrink-0">
-              <AlertTriangle className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
-            </div>
-            <div>
-              <p className="text-sm font-medium text-amber-900 dark:text-amber-300">
-                {attentionCount} request{attentionCount !== 1 ? 's' : ''} need attention
-              </p>
-              <p className="text-xs text-amber-700 dark:text-amber-500 mt-0.5">
-                {[
-                  data.highPrio > 0 && `${data.highPrio} high priority`,
-                  checkRemarks > 0 && `${checkRemarks} check remarks`,
-                ]
-                  .filter(Boolean)
-                  .join(' · ')}
-              </p>
-            </div>
-          </div>
-          <Link
-            href="/osc"
-            className="text-xs font-medium text-amber-700 dark:text-amber-400 hover:text-amber-900 dark:hover:text-amber-300 flex-shrink-0 whitespace-nowrap transition-colors"
-          >
-            Review all →
-          </Link>
-        </div>
-      )}
 
       {/* KPIs */}
       <StatsCards
         total={data.total}
         updated={statusCounts['OSC_UPDATED'] ?? 0}
-        onHold={statusCounts['ON_HOLD'] ?? 0}
         highPrio={data.highPrio}
-        emailSent={(statusCounts['EMAIL_SENT'] ?? 0) + (statusCounts['EMAIL_SENT_REMINDER'] ?? 0)}
         checkRemarks={checkRemarks}
         weeklyCount={data.weeklyCount}
         avgOscDays={data.avgOscDays}
