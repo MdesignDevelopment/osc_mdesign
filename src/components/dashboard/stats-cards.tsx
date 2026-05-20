@@ -1,10 +1,5 @@
 import {
-  CheckCircle2,
-  Clock,
   AlertTriangle,
-  Mail,
-  MessageSquare,
-  FileText,
   TrendingUp,
   Timer,
   CalendarDays,
@@ -15,9 +10,7 @@ import { cn } from '@/lib/utils'
 interface StatsCardsProps {
   total: number
   updated: number
-  onHold: number
   highPrio: number
-  emailSent: number
   checkRemarks: number
   weeklyCount: number
   avgOscDays: number
@@ -163,56 +156,15 @@ export function StatsCards(props: StatsCardsProps) {
         </div>
       </div>
 
-      {/* Primary KPIs */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-        <KpiCard
-          label="Total"
-          value={props.total}
-          icon={FileText}
-          iconClass="bg-neutral-100 dark:bg-white/8 text-neutral-500 dark:text-neutral-400"
-          description="All requests"
-        />
+      {/* Metrics */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         <KpiCard
           label="High Priority"
           value={props.highPrio}
           icon={AlertTriangle}
-          iconClass="bg-rose-100 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400"
-          highlight="rose"
+          iconClass="bg-neutral-100 dark:bg-white/8 text-neutral-500 dark:text-neutral-400"
           description="Immediate action"
         />
-        <KpiCard
-          label="Check Remarks"
-          value={props.checkRemarks}
-          icon={MessageSquare}
-          iconClass="bg-amber-100 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400"
-          highlight="amber"
-          description="Pending review"
-        />
-        <KpiCard
-          label="OSC Updated"
-          value={props.updated}
-          icon={CheckCircle2}
-          iconClass="bg-emerald-100 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400"
-          description="Completed"
-        />
-        <KpiCard
-          label="On Hold"
-          value={props.onHold}
-          icon={Clock}
-          iconClass="bg-neutral-100 dark:bg-white/8 text-neutral-500 dark:text-neutral-400"
-          description="Awaiting action"
-        />
-        <KpiCard
-          label="Email Sent"
-          value={props.emailSent}
-          icon={Mail}
-          iconClass="bg-violet-100 dark:bg-violet-950/50 text-violet-600 dark:text-violet-400"
-          description="Incl. reminders"
-        />
-      </div>
-
-      {/* Performance metrics */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <MetricCard
           label="New This Week"
           value={props.weeklyCount}
@@ -237,7 +189,6 @@ export function StatsCards(props: StatsCardsProps) {
           icon={CalendarDays}
           iconClass="bg-teal-100 dark:bg-teal-950/50 text-teal-600 dark:text-teal-400"
           description="From received to mail sent"
-          warn={props.avgMailDays > 7}
         />
       </div>
     </div>
