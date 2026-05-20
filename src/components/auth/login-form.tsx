@@ -25,12 +25,11 @@ export function LoginForm() {
       password: data.password,
       redirect: false,
     })
-    setLoading(false)
     if (result?.error) {
+      setLoading(false)
       setError('Invalid email or password. Please try again.')
     } else {
       router.push('/dashboard')
-      router.refresh()
     }
   }
 
