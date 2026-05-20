@@ -1,7 +1,7 @@
 import { prisma } from '@/lib/db'
 import { getSession } from '@/lib/auth'
 import { redirect } from 'next/navigation'
-import { OscForm } from '@/components/osc/osc-form'
+import { NewOscTabs } from '@/components/osc/new-osc-tabs'
 
 export default async function NewOscPage() {
   const session = await getSession()
@@ -11,12 +11,12 @@ export default async function NewOscPage() {
   const partners = await prisma.partner.findMany({ orderBy: { name: 'asc' } })
 
   return (
-    <div className="max-w-2xl space-y-6">
+    <div className="max-w-2xl mx-auto space-y-6">
       <div>
         <h1 className="text-xl font-semibold text-gray-900">New OSC Request</h1>
         <p className="text-sm text-gray-500 mt-0.5">Create a new OSC tracking entry</p>
       </div>
-      <OscForm partners={partners} />
+      <NewOscTabs partners={partners} />
     </div>
   )
 }

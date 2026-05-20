@@ -59,6 +59,20 @@ async function main() {
   })
   console.log('Created admin:', admin.email)
 
+  // Create test admin user
+  const testAdminPassword = await bcrypt.hash('test123', 10)
+  const testAdmin = await prisma.user.upsert({
+    where: { email: 'test@mdesign.ma' },
+    update: {},
+    create: {
+      name: 'test',
+      email: 'test@mdesign.ma',
+      password: testAdminPassword,
+      role: Role.ADMIN,
+    },
+  })
+  console.log('Created admin:', testAdmin.email)
+
   // Seed partners
   const partnerMap: Record<string, string> = {}
   for (const name of PARTNERS) {
