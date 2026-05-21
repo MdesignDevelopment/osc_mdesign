@@ -1,7 +1,7 @@
 import { z } from 'zod'
 
 export const loginSchema = z.object({
-  email: z.string().email('Invalid email address'),
+  email: z.string().email('Invalid email address').transform(v => v.toLowerCase().trim()),
   password: z.string().min(1, 'Password is required'),
 })
 
@@ -23,14 +23,14 @@ export const commentSchema = z.object({
 
 export const userCreateSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters'),
-  email: z.string().email('Invalid email address'),
+  email: z.string().email('Invalid email address').transform(v => v.toLowerCase().trim()),
   password: z.string().min(12, 'Password must be at least 12 characters'),
   role: z.enum(['ADMIN', 'SUPPORT_ENGINEER', 'EXTERN']),
 })
 
 export const userUpdateSchema = z.object({
   name: z.string().min(2).optional(),
-  email: z.string().email().optional(),
+  email: z.string().email().transform(v => v.toLowerCase().trim()).optional(),
   password: z.string().min(12, 'Password must be at least 12 characters').optional().nullable(),
   role: z.enum(['ADMIN', 'SUPPORT_ENGINEER', 'EXTERN']).optional(),
   active: z.boolean().optional(),
