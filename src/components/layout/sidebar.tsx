@@ -4,7 +4,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { Session } from 'next-auth'
-import { LayoutDashboard, ClipboardList, Users, X } from 'lucide-react'
+import { LayoutDashboard, ClipboardList, Users, History, X } from 'lucide-react'
 import { cn, avatarColor, ROLE_LABELS } from '@/lib/utils'
 
 interface SidebarProps {
@@ -16,12 +16,14 @@ interface SidebarProps {
 const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/osc', label: 'OSC Requests', icon: ClipboardList },
+  { href: '/history', label: 'Change History', icon: History, noExtern: true },
   { href: '/users', label: 'User Management', icon: Users, adminOnly: true },
 ]
 
 export function Sidebar({ session, open, onClose }: SidebarProps) {
   const pathname = usePathname()
   const isAdmin = session.user.role === 'ADMIN'
+  const isExtern = session.user.role === 'EXTERN'
   const userInitial = session.user.name?.charAt(0).toUpperCase() ?? '?'
   const bgColor = avatarColor(session.user.name ?? 'U')
 
@@ -51,6 +53,7 @@ export function Sidebar({ session, open, onClose }: SidebarProps) {
         <nav className="flex-1 px-2 py-3 space-y-0.5 overflow-y-auto">
           {navItems.map((item) => {
             if (item.adminOnly && !isAdmin) return null
+            if ('noExtern' in item && item.noExtern && isExtern) return null
             const Icon = item.icon
             const active = pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(item.href))
             return (
