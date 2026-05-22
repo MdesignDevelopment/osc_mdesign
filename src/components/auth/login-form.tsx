@@ -42,7 +42,7 @@ export function LoginForm() {
           type="email"
           autoComplete="email"
           className="jira-input"
-          placeholder="you@example.com"
+          placeholder="enter your email address"
         />
         {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email.message}</p>}
       </div>
