@@ -44,9 +44,9 @@ export async function GET() {
     'Status': STATUS_LABELS[r.status] ?? r.status,
     'Priority': r.priority ? (PRIORITY_LABELS[r.priority] ?? r.priority) : '',
     'Remark': r.remark ?? '',
-    'Received Date': fmt(r.receivedDate),
     'OSC Request Date': fmt(r.oscRequestDate),
     'Mail Sent Date': fmt(r.mailSentDate),
+    'Received Date': fmt(r.receivedDate),
     'Updated Date': fmt(r.updatedDate),
     'Created By': r.createdBy.name,
     'Created At': fmt(r.createdAt),
@@ -62,9 +62,9 @@ export async function GET() {
     { wch: 20 }, // Status
     { wch: 16 }, // Priority
     { wch: 40 }, // Remark
-    { wch: 16 }, // Received Date
     { wch: 18 }, // OSC Request Date
     { wch: 16 }, // Mail Sent Date
+    { wch: 16 }, // Received Date
     { wch: 16 }, // Updated Date
     { wch: 20 }, // Created By
     { wch: 14 }, // Created At

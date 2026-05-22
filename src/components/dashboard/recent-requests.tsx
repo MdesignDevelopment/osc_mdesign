@@ -38,9 +38,9 @@ export function RecentRequests({ requests }: { requests: RecentRequest[] }) {
               <th className="jira-table-header">Partner</th>
               <th className="jira-table-header">Status</th>
               <th className="jira-table-header">Priority</th>
-              <th className="jira-table-header">Received</th>
               <th className="jira-table-header">OSC Request</th>
-              <th className="jira-table-header pr-5">Mail Sent</th>
+              <th className="jira-table-header">Mail Sent</th>
+              <th className="jira-table-header pr-5">Received</th>
             </tr>
           </thead>
           <tbody>
@@ -77,13 +77,13 @@ export function RecentRequests({ requests }: { requests: RecentRequest[] }) {
                     <PriorityLozenge priority={req.priority as Priority} />
                   </td>
                   <td className="jira-table-cell text-neutral-400 dark:text-neutral-500 whitespace-nowrap tabular-nums text-xs">
-                    {formatDate(req.receivedDate)}
-                  </td>
-                  <td className="jira-table-cell text-neutral-400 dark:text-neutral-500 whitespace-nowrap tabular-nums text-xs">
                     {formatDate(req.oscRequestDate)}
                   </td>
-                  <td className="jira-table-cell text-neutral-400 dark:text-neutral-500 whitespace-nowrap tabular-nums text-xs pr-5">
+                  <td className="jira-table-cell text-neutral-400 dark:text-neutral-500 whitespace-nowrap tabular-nums text-xs">
                     {formatDate(req.mailSentDate)}
+                  </td>
+                  <td className="jira-table-cell text-neutral-400 dark:text-neutral-500 whitespace-nowrap tabular-nums text-xs pr-5">
+                    {formatDate(req.receivedDate)}
                   </td>
                 </tr>
               )

@@ -44,13 +44,13 @@ export async function GET() {
 
   const wb = XLSX.utils.book_new()
   const ws = XLSX.utils.aoa_to_sheet([
-    ['Partner', 'Pop Zone', 'Status', 'Priority', 'Remark', 'Received Date', 'OSC Request Date', 'Mail Sent Date', 'Updated Date'],
+    ['Partner', 'Pop Zone', 'Status', 'Priority', 'Remark', 'OSC Request Date', 'Mail Sent Date', 'Received Date', 'Updated Date'],
     ['Partner Name', 'MRO_CITY_01_POP_001', 'On Hold', 'High Priority', 'Example remark', '01/01/2025', '', '', ''],
   ])
 
   ws['!cols'] = [
     { wch: 22 }, { wch: 24 }, { wch: 22 }, { wch: 16 },
-    { wch: 40 }, { wch: 16 }, { wch: 18 }, { wch: 16 }, { wch: 16 },
+    { wch: 40 }, { wch: 18 }, { wch: 16 }, { wch: 16 }, { wch: 16 },
   ]
 
   XLSX.utils.book_append_sheet(wb, ws, 'OSC Bulk Import')

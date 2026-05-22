@@ -87,14 +87,14 @@ export default async function OscDetailPage({ params }: { params: { id: string }
             <SidebarField label="Partner">
               <span className="text-sm text-slate-800">{request.partner.name}</span>
             </SidebarField>
-            <SidebarField label="Received">
-              <span className="text-sm text-slate-800">{formatDate(request.receivedDate)}</span>
-            </SidebarField>
             <SidebarField label="OSC Request">
               <span className="text-sm text-slate-800">{formatDate(request.oscRequestDate)}</span>
             </SidebarField>
             <SidebarField label="Mail Sent">
               <span className="text-sm text-slate-800">{formatDate(request.mailSentDate)}</span>
+            </SidebarField>
+            <SidebarField label="Received">
+              <span className="text-sm text-slate-800">{formatDate(request.receivedDate)}</span>
             </SidebarField>
             <SidebarField label="Updated">
               <span className="text-sm text-slate-800">{formatDate(request.updatedDate)}</span>

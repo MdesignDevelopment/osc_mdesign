@@ -115,16 +115,16 @@ export function OscForm({ partners, initialData }: OscFormProps) {
             </select>
           </Field>
 
-          <Field label="Received Date">
-            <input {...register('receivedDate')} type="date" className="jira-input" />
-          </Field>
-
           <Field label="OSC Request Date">
             <input {...register('oscRequestDate')} type="date" className="jira-input" />
           </Field>
 
           <Field label="Mail Sent to Partner">
             <input {...register('mailSentDate')} type="date" className="jira-input" />
+          </Field>
+
+          <Field label="Received Date">
+            <input {...register('receivedDate')} type="date" className="jira-input" />
           </Field>
 
           <Field label="Updated Date">

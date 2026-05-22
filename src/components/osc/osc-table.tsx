@@ -140,16 +140,16 @@ export function OscTable({ requests, partners, total, page, pageSize, searchPara
       'Status': STATUS_LABELS[r.status] ?? r.status,
       'Priority': r.priority ? (PRIORITY_LABELS[r.priority] ?? r.priority) : '',
       'Remark': r.remark ?? '',
-      'Received Date': fmtDate(r.receivedDate),
       'OSC Request Date': fmtDate(r.oscRequestDate),
       'Mail Sent Date': fmtDate(r.mailSentDate),
+      'Received Date': fmtDate(r.receivedDate),
       'Updated Date': fmtDate(r.updatedDate),
     }))
     const wb = XLSX.utils.book_new()
     const ws = XLSX.utils.json_to_sheet(rows)
     ws['!cols'] = [
       { wch: 26 }, { wch: 22 }, { wch: 20 }, { wch: 16 },
-      { wch: 40 }, { wch: 16 }, { wch: 18 }, { wch: 16 }, { wch: 16 },
+      { wch: 40 }, { wch: 18 }, { wch: 16 }, { wch: 16 }, { wch: 16 },
     ]
     XLSX.utils.book_append_sheet(wb, ws, 'OSC Requests')
     const buffer = XLSX.write(wb, { type: 'array', bookType: 'xlsx' })
@@ -309,9 +309,9 @@ export function OscTable({ requests, partners, total, page, pageSize, searchPara
                 <SortableTh label="Partner"     sortKey="partner"        {...sharedSortProps} />
                 <SortableTh label="Status"      sortKey="status"         {...sharedSortProps} />
                 <SortableTh label="Priority"    sortKey="priority"       {...sharedSortProps} />
-                <SortableTh label="Received"    sortKey="receivedDate"   {...sharedSortProps} />
                 <SortableTh label="OSC Request" sortKey="oscRequestDate" {...sharedSortProps} />
                 <SortableTh label="Mail Sent"   sortKey="mailSentDate"   {...sharedSortProps} />
+                <SortableTh label="Received"    sortKey="receivedDate"   {...sharedSortProps} />
                 <SortableTh label="Remark"      sortKey="remark"         {...sharedSortProps} className="max-w-[160px]" />
                 <th className="jira-table-header w-8" />
               </tr>
@@ -364,13 +364,13 @@ export function OscTable({ requests, partners, total, page, pageSize, searchPara
                         <PriorityLozenge priority={req.priority as Priority} />
                       </td>
                       <td className="jira-table-cell text-neutral-400 dark:text-neutral-500 whitespace-nowrap tabular-nums">
-                        {formatDate(req.receivedDate)}
-                      </td>
-                      <td className="jira-table-cell text-neutral-400 dark:text-neutral-500 whitespace-nowrap tabular-nums">
                         {formatDate(req.oscRequestDate)}
                       </td>
                       <td className="jira-table-cell text-neutral-400 dark:text-neutral-500 whitespace-nowrap tabular-nums">
                         {formatDate(req.mailSentDate)}
+                      </td>
+                      <td className="jira-table-cell text-neutral-400 dark:text-neutral-500 whitespace-nowrap tabular-nums">
+                        {formatDate(req.receivedDate)}
                       </td>
                       <td className="jira-table-cell text-neutral-400 dark:text-neutral-500 max-w-[160px]">
                         <span className="truncate block">{req.remark || '—'}</span>
