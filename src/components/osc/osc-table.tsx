@@ -312,6 +312,7 @@ export function OscTable({ requests, partners, total, page, pageSize, searchPara
                 <SortableTh label="OSC Request" sortKey="oscRequestDate" {...sharedSortProps} />
                 <SortableTh label="Mail Sent"   sortKey="mailSentDate"   {...sharedSortProps} />
                 <SortableTh label="Received"    sortKey="receivedDate"   {...sharedSortProps} />
+                <SortableTh label="Updated"     sortKey="updatedDate"    {...sharedSortProps} />
                 <SortableTh label="Remark"      sortKey="remark"         {...sharedSortProps} className="max-w-[160px]" />
                 <th className="jira-table-header w-8" />
               </tr>
@@ -319,7 +320,7 @@ export function OscTable({ requests, partners, total, page, pageSize, searchPara
             <tbody>
               {requests.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="text-center py-12 text-neutral-400 dark:text-neutral-600 text-sm">
+                  <td colSpan={11} className="text-center py-12 text-neutral-400 dark:text-neutral-600 text-sm">
                     No OSC requests found
                   </td>
                 </tr>
@@ -371,6 +372,9 @@ export function OscTable({ requests, partners, total, page, pageSize, searchPara
                       </td>
                       <td className="jira-table-cell text-neutral-400 dark:text-neutral-500 whitespace-nowrap tabular-nums">
                         {formatDate(req.receivedDate)}
+                      </td>
+                      <td className="jira-table-cell text-neutral-400 dark:text-neutral-500 whitespace-nowrap tabular-nums">
+                        {formatDate(req.updatedDate)}
                       </td>
                       <td className="jira-table-cell text-neutral-400 dark:text-neutral-500 max-w-[160px]">
                         <span className="truncate block">{req.remark || '—'}</span>
