@@ -36,8 +36,18 @@ export const userUpdateSchema = z.object({
   active: z.boolean().optional(),
 })
 
+export const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1, 'Current password is required'),
+  newPassword: z.string().min(12, 'New password must be at least 12 characters'),
+  confirmPassword: z.string().min(1, 'Please confirm your new password'),
+}).refine(data => data.newPassword === data.confirmPassword, {
+  message: 'Passwords do not match',
+  path: ['confirmPassword'],
+})
+
 export type LoginInput = z.infer<typeof loginSchema>
 export type OscRequestInput = z.infer<typeof oscRequestSchema>
 export type CommentInput = z.infer<typeof commentSchema>
 export type UserCreateInput = z.infer<typeof userCreateSchema>
 export type UserUpdateInput = z.infer<typeof userUpdateSchema>
+export type ChangePasswordInput = z.infer<typeof changePasswordSchema>
