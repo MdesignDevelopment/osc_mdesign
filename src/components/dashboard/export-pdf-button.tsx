@@ -185,7 +185,7 @@ async function buildPdf(data: ReportData) {
   autoTable(doc, {
     startY: y,
     margin: { left: M, right: M },
-    head: [['Partner', 'OSC Request', 'Received', 'Updated', 'Total']],
+    head: [['Partner', 'On Going', 'On Hold', 'Completed', 'Total Requests']],
     body: data.byPartnerStacked.map((p) => [
       p.name,
       p.oscRequest.toString(),
