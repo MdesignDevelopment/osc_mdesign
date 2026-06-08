@@ -92,11 +92,41 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
   return NextResponse.json(updated)
 }
 
-export async function DELETE(_: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
   const session = await getSession()
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (session.user.role !== 'ADMIN') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  if (session.user.role === 'EXTERN') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-  await prisma.oscRequest.delete({ where: { id: params.id } })
+  const request = await prisma.oscRequest.findUnique({
+    where: { id: params.id },
+    include: { partner: { select: { name: true } } },
+  })
+  if (!request) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+
+  const body = await req.json().catch(() => ({})) as { reason?: string }
+  const reason = typeof body?.reason === 'string' ? body.reason.trim() : ''
+
+  await prisma.$transaction([
+    prisma.oscHistory.create({
+      data: {
+        oscRequestId: params.id,
+        userId: session.user.id,
+        fieldChanged: 'deleted',
+        oldValue: request.popzone,
+        newValue: request.partner.name,
+      },
+    }),
+    ...(reason ? [prisma.oscHistory.create({
+      data: {
+        oscRequestId: params.id,
+        userId: session.user.id,
+        fieldChanged: 'deleteReason',
+        oldValue: null,
+        newValue: reason,
+      },
+    })] : []),
+    prisma.oscRequest.delete({ where: { id: params.id } }),
+  ])
+
   return NextResponse.json({ success: true })
 }
