@@ -84,13 +84,13 @@ model OscComment {
 }
 
 model OscHistory {
-  id           String     @id @default(cuid())
-  oscRequestId String
-  oscRequest   OscRequest @relation(fields: [oscRequestId], references: [id], onDelete: Cascade)
+  id           String      @id @default(cuid())
+  oscRequestId String?
+  oscRequest   OscRequest? @relation(fields: [oscRequestId], references: [id], onDelete: SetNull)
   userId       String
-  user         User       @relation(fields: [userId], references: [id])
+  user         User        @relation(fields: [userId], references: [id])
   fieldChanged String
   oldValue     String?
   newValue     String?
-  changedAt    DateTime   @default(now())
+  changedAt    DateTime    @default(now())
 }

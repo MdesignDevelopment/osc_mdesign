@@ -3,6 +3,7 @@ import { getSession } from '@/lib/auth'
 import { redirect, notFound } from 'next/navigation'
 import { unstable_noStore as noStore } from 'next/cache'
 import { OscTimeline } from '@/components/osc/osc-timeline'
+import { DeleteOscButton } from '@/components/osc/delete-osc-button'
 import Link from 'next/link'
 import { Pencil, ChevronRight } from 'lucide-react'
 import { formatDate } from '@/lib/utils'
@@ -50,10 +51,13 @@ export default async function OscDetailPage({ params }: { params: { id: string }
           <div className="flex items-start justify-between gap-3">
             <h1 className="text-2xl font-bold text-slate-900 leading-tight">{request.popzone}</h1>
             {canEdit && (
-              <Link href={`/osc/${params.id}/edit`} className="jira-btn-secondary flex-shrink-0 text-xs">
-                <Pencil className="w-3.5 h-3.5" />
-                Edit
-              </Link>
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <Link href={`/osc/${params.id}/edit`} className="jira-btn-secondary text-xs">
+                  <Pencil className="w-3.5 h-3.5" />
+                  Edit
+                </Link>
+                <DeleteOscButton id={params.id} />
+              </div>
             )}
           </div>
 

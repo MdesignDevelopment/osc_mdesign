@@ -26,11 +26,16 @@ export const STATUS_LABELS: Record<OscStatus, string> = {
 }
 
 export const STATUS_LOZENGE: Record<OscStatus, string> = {
-  OSC_UPDATED: 'bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200',
-  EMAIL_SENT: 'bg-blue-50 text-blue-600 ring-1 ring-inset ring-blue-200',
-  EMAIL_SENT_REMINDER: 'bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-200',
-  ON_HOLD: 'bg-slate-100 text-slate-500',
-  CHECK_REMARKS: 'bg-red-50 text-red-600 ring-1 ring-inset ring-red-200',
+  OSC_UPDATED:
+    'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 ring-1 ring-inset ring-emerald-200 dark:ring-emerald-800/50',
+  EMAIL_SENT:
+    'bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 ring-1 ring-inset ring-blue-200 dark:ring-blue-800/50',
+  EMAIL_SENT_REMINDER:
+    'bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400 ring-1 ring-inset ring-amber-200 dark:ring-amber-800/50',
+  ON_HOLD:
+    'bg-zinc-100 dark:bg-zinc-800/50 text-zinc-500 dark:text-zinc-400',
+  CHECK_REMARKS:
+    'bg-red-50 dark:bg-red-950/30 text-red-600 dark:text-red-400 ring-1 ring-inset ring-red-200 dark:ring-red-800/50',
 }
 
 export const PRIORITY_LABELS: Record<Priority, string> = {
@@ -41,10 +46,14 @@ export const PRIORITY_LABELS: Record<Priority, string> = {
 }
 
 export const PRIORITY_LOZENGE: Record<Priority, string> = {
-  HIGH_PRIO: 'bg-red-50 text-red-600 ring-1 ring-inset ring-red-200',
-  MEDIUM_PRIO: 'bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-200',
-  LOW_PRIO: 'bg-slate-100 text-slate-500',
-  NOT_DEFINED: 'bg-slate-100 text-slate-400',
+  HIGH_PRIO:
+    'bg-red-50 dark:bg-red-950/30 text-red-600 dark:text-red-400 ring-1 ring-inset ring-red-200 dark:ring-red-800/50',
+  MEDIUM_PRIO:
+    'bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400 ring-1 ring-inset ring-amber-200 dark:ring-amber-800/50',
+  LOW_PRIO:
+    'bg-zinc-100 dark:bg-zinc-800/50 text-zinc-500 dark:text-zinc-400',
+  NOT_DEFINED:
+    'bg-zinc-100 dark:bg-zinc-800/50 text-zinc-400 dark:text-zinc-500',
 }
 
 export const ROLE_LABELS = {
@@ -56,7 +65,7 @@ export const ROLE_LABELS = {
 export const ROLE_LOZENGE = {
   ADMIN: 'bg-violet-600 text-white',
   SUPPORT_ENGINEER: 'bg-blue-600 text-white',
-  EXTERN: 'bg-slate-500 text-white',
+  EXTERN: 'bg-zinc-500 text-white',
 }
 
 const AVATAR_COLORS = [

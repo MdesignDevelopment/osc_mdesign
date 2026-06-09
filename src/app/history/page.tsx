@@ -12,7 +12,7 @@ import {
   PRIORITY_LABELS,
 } from '@/lib/utils'
 import Link from 'next/link'
-import { ArrowRight, ExternalLink, History, ChevronLeft, ChevronRight } from 'lucide-react'
+import { ArrowRight, ExternalLink, History, ChevronLeft, ChevronRight, Trash2 } from 'lucide-react'
 import { format } from 'date-fns'
 
 const PAGE_SIZE = 50
@@ -27,6 +27,8 @@ const FIELD_LABELS: Record<string, string> = {
   mailSentDate: 'Mail Sent Date',
   updatedDate: 'Updated Date',
   partnerId: 'Partner',
+  deleted: 'Request',
+  deleteReason: 'Deletion Reason',
 }
 
 function formatFieldValue(field: string, value: string | null | undefined): string {
@@ -125,22 +127,53 @@ export default async function HistoryPage({ searchParams }: PageProps) {
           {records.map((record) => {
             const initial = record.user.name.charAt(0).toUpperCase()
             const bg = avatarColor(record.user.name)
+            const isDeleted = record.fieldChanged === 'deleted'
+            const isDeleteReason = record.fieldChanged === 'deleteReason'
             const fieldLabel = FIELD_LABELS[record.fieldChanged] ?? record.fieldChanged
             const oldVal = formatFieldValue(record.fieldChanged, record.oldValue)
             const newVal = formatFieldValue(record.fieldChanged, record.newValue)
+            const popzone = isDeleted ? (record.oldValue ?? 'Unknown') : record.oscRequest?.popzone
+            const partnerName = isDeleted ? (record.newValue ?? '') : record.oscRequest?.partner.name
+
+            if (isDeleteReason) {
+              return (
+                <div
+                  key={record.id}
+                  className="bg-red-50/20 rounded-lg border border-red-100 px-4 py-2.5 flex items-start gap-3"
+                >
+                  <div className="w-8 h-8 flex-shrink-0 flex items-center justify-center mt-0.5">
+                    <div className="w-px h-full bg-red-200 mx-auto" style={{ height: 20 }} />
+                  </div>
+                  <div className="flex-1 min-w-0 flex items-center gap-2 flex-wrap">
+                    <span className="text-[11px] font-medium text-neutral-400 uppercase tracking-wide">Reason</span>
+                    <span className="text-[12.5px] text-neutral-600 italic">
+                      {record.newValue ?? '—'}
+                    </span>
+                  </div>
+                  <span className="text-[11px] text-neutral-400 whitespace-nowrap tabular-nums flex-shrink-0">
+                    {formatDateTime(record.changedAt)}
+                  </span>
+                </div>
+              )
+            }
 
             return (
               <div
                 key={record.id}
-                className="bg-white rounded-lg border border-neutral-200 px-4 py-3 flex items-start gap-3 hover:border-neutral-300 transition-colors"
+                className={cn(
+                  'bg-white rounded-lg border px-4 py-3 flex items-start gap-3 transition-colors',
+                  isDeleted
+                    ? 'border-red-100 bg-red-50/30 hover:border-red-200'
+                    : 'border-neutral-200 hover:border-neutral-300',
+                )}
               >
                 <div
                   className={cn(
                     'w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-semibold flex-shrink-0 mt-0.5',
-                    bg,
+                    isDeleted ? 'bg-red-500' : bg,
                   )}
                 >
-                  {initial}
+                  {isDeleted ? <Trash2 className="w-3.5 h-3.5" /> : initial}
                 </div>
 
                 <div className="flex-1 min-w-0">
@@ -154,43 +187,58 @@ export default async function HistoryPage({ searchParams }: PageProps) {
                     >
                       {ROLE_LABELS[record.user.role as keyof typeof ROLE_LABELS]}
                     </span>
-                    <span className="text-xs text-neutral-400">changed</span>
-                    <span className="text-xs font-medium text-neutral-600 bg-neutral-100 px-1.5 py-0.5 rounded">
-                      {fieldLabel}
-                    </span>
-                    <span className="text-xs text-neutral-400">on</span>
-                    <Link
-                      href={`/osc/${record.oscRequest.id}`}
-                      className="text-xs font-medium text-blue-600 hover:text-blue-700 hover:underline"
-                    >
-                      {record.oscRequest.popzone}
-                    </Link>
+                    {isDeleted ? (
+                      <>
+                        <span className="text-xs text-neutral-400">deleted</span>
+                        <span className="text-xs font-medium text-red-600 bg-red-50 border border-red-100 px-1.5 py-0.5 rounded">
+                          {popzone}
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="text-xs text-neutral-400">changed</span>
+                        <span className="text-xs font-medium text-neutral-600 bg-neutral-100 px-1.5 py-0.5 rounded">
+                          {fieldLabel}
+                        </span>
+                        <span className="text-xs text-neutral-400">on</span>
+                        <Link
+                          href={`/osc/${record.oscRequest!.id}`}
+                          className="text-xs font-medium text-blue-600 hover:text-blue-700 hover:underline"
+                        >
+                          {popzone}
+                        </Link>
+                      </>
+                    )}
                     <span className="text-xs text-neutral-300">·</span>
-                    <span className="text-xs text-neutral-400">{record.oscRequest.partner.name}</span>
+                    <span className="text-xs text-neutral-400">{partnerName}</span>
                   </div>
 
-                  <div className="flex items-center gap-1.5 mt-1.5">
-                    <span className="text-xs text-neutral-400 bg-neutral-50 border border-neutral-100 px-2 py-0.5 rounded line-through max-w-[220px] truncate">
-                      {oldVal}
-                    </span>
-                    <ArrowRight className="w-3 h-3 text-neutral-300 flex-shrink-0" />
-                    <span className="text-xs font-medium bg-blue-50 text-blue-700 border border-blue-100 px-2 py-0.5 rounded max-w-[220px] truncate">
-                      {newVal}
-                    </span>
-                  </div>
+                  {!isDeleted && (
+                    <div className="flex items-center gap-1.5 mt-1.5">
+                      <span className="text-xs text-neutral-400 bg-neutral-50 border border-neutral-100 px-2 py-0.5 rounded line-through max-w-[220px] truncate">
+                        {oldVal}
+                      </span>
+                      <ArrowRight className="w-3 h-3 text-neutral-300 flex-shrink-0" />
+                      <span className="text-xs font-medium bg-blue-50 text-blue-700 border border-blue-100 px-2 py-0.5 rounded max-w-[220px] truncate">
+                        {newVal}
+                      </span>
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex flex-col items-end gap-2 flex-shrink-0">
                   <span className="text-[11px] text-neutral-400 whitespace-nowrap tabular-nums">
                     {formatDateTime(record.changedAt)}
                   </span>
-                  <Link
-                    href={`/osc/${record.oscRequest.id}`}
-                    className="inline-flex items-center gap-1 text-[11px] font-medium text-blue-600 hover:text-blue-700"
-                  >
-                    View Popzone
-                    <ExternalLink className="w-3 h-3" />
-                  </Link>
+                  {!isDeleted && record.oscRequest && (
+                    <Link
+                      href={`/osc/${record.oscRequest.id}`}
+                      className="inline-flex items-center gap-1 text-[11px] font-medium text-blue-600 hover:text-blue-700"
+                    >
+                      View Popzone
+                      <ExternalLink className="w-3 h-3" />
+                    </Link>
+                  )}
                 </div>
               </div>
             )
