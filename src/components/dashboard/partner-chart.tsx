@@ -13,7 +13,7 @@ import {
 interface PartnerStackedEntry {
   name: string
   oscRequest: number
-  received: number
+  onHold: number
   updated: number
 }
 
@@ -57,7 +57,7 @@ export function PartnerChart({ data }: PartnerChartProps) {
   const sorted = [...data]
     .sort(
       (a, b) =>
-        b.oscRequest + b.received + b.updated - (a.oscRequest + a.received + a.updated),
+        b.oscRequest + b.onHold + b.updated - (a.oscRequest + a.onHold + a.updated),
     )
     .slice(0, 10)
 
@@ -82,7 +82,7 @@ export function PartnerChart({ data }: PartnerChartProps) {
           </span>
           <span className="flex items-center gap-1.5">
             <span className="w-2 h-2 rounded-full bg-[#6366F1]" />
-            Received
+            On Hold
           </span>
           <span className="flex items-center gap-1.5">
             <span className="w-2 h-2 rounded-full bg-[#10B981]" />
@@ -124,8 +124,8 @@ export function PartnerChart({ data }: PartnerChartProps) {
               radius={[3, 0, 0, 3]}
             />
             <Bar
-              dataKey="received"
-              name="Received"
+              dataKey="onHold"
+              name="On Hold"
               stackId="a"
               fill="#6366F1"
               radius={[0, 0, 0, 0]}

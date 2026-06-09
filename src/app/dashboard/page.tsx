@@ -77,13 +77,13 @@ async function getDashboardData() {
     select: { partnerId: true, receivedDate: true, status: true },
   })
 
-  const buckets: Record<string, { oscRequest: number; received: number; updated: number }> = {}
+  const buckets: Record<string, { oscRequest: number; onHold: number; updated: number }> = {}
   for (const req of partnerRequests) {
-    if (!buckets[req.partnerId]) buckets[req.partnerId] = { oscRequest: 0, received: 0, updated: 0 }
+    if (!buckets[req.partnerId]) buckets[req.partnerId] = { oscRequest: 0, onHold: 0, updated: 0 }
     if (req.status === 'OSC_UPDATED') {
       buckets[req.partnerId].updated++
-    } else if (req.receivedDate !== null) {
-      buckets[req.partnerId].received++
+    } else if (req.status === 'ON_HOLD') {
+      buckets[req.partnerId].onHold++
     } else {
       buckets[req.partnerId].oscRequest++
     }
@@ -92,7 +92,7 @@ async function getDashboardData() {
   const byPartnerStacked = byPartner.map((p: { partnerId: string; _count: { _all: number } }) => ({
     name: partnerNameMap[p.partnerId] ?? 'Unknown',
     oscRequest: buckets[p.partnerId]?.oscRequest ?? 0,
-    received: buckets[p.partnerId]?.received ?? 0,
+    onHold: buckets[p.partnerId]?.onHold ?? 0,
     updated: buckets[p.partnerId]?.updated ?? 0,
   }))
 
