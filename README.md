@@ -23,6 +23,7 @@ docker compose --profile migrate up migrate
 - **OSC Detail / Story Line** — Jira-style activity timeline with comments and change history
 - **OSC Form** — Create/edit with all fields: partner, popzone, dates, status, priority, remark
 - **User Management** — Admin-only: create, edit, activate/deactivate users, assign roles
+- **API Integration** — Data API with a daily-rotating key for loading OSC requests into Excel (Power Query), Power BI, or any HTTP client
 
 ## Roles
 
@@ -31,6 +32,21 @@ docker compose --profile migrate up migrate
 | **Admin** | Full access — users, all OSC operations, delete comments |
 | **Support Engineer** | Create/edit OSC requests, comment |
 | **External** | Read-only — view dashboard, OSC list, and detail pages |
+
+## API Integration (Excel / Power Query)
+
+The app exposes a read-only data API for external tools:
+
+```
+GET /api/v1/osc-requests
+```
+
+- Returns **all OSC requests** as JSON (`{ generatedAt, count, data: [...] }`).
+- Authenticated with a **daily-rotating API key** — pass it as an `X-API-Key` header or `?api_key=` query parameter.
+- The key is derived from `API_KEY_SECRET` (or `NEXTAUTH_SECRET`) + the current UTC date, so it changes automatically at **midnight UTC** with no cron job or database state.
+- Any logged-in user (including External users) can copy the current key from the **API Integration** page in the app, which also contains a step-by-step Excel Power Query guide with a ready-to-paste M script.
+
+When an Excel refresh fails with `401 Unauthorized`, the key has rotated — copy the new key from the API Integration page and update the `ApiKey` value in the Power Query script.
 
 ## Development (without Docker)
 
@@ -54,3 +70,4 @@ npm run dev
 | `NEXTAUTH_SECRET` | Random secret (min 32 chars) |
 | `NEXTAUTH_URL` | App URL (e.g. `http://localhost:3000`) |
 | `XLSX_PATH` | Path to Excel file for seeding (seed script only) |
+| `API_KEY_SECRET` | Optional — secret used to derive the daily data API key (falls back to `NEXTAUTH_SECRET`) |

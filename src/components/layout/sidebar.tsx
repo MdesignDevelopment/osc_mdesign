@@ -4,7 +4,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { Session } from 'next-auth'
-import { LayoutDashboard, ClipboardList, Users, History, Settings, X } from 'lucide-react'
+import { LayoutDashboard, ClipboardList, Users, History, Settings, Plug, X } from 'lucide-react'
 import { cn, avatarColor, ROLE_LABELS } from '@/lib/utils'
 
 interface SidebarProps {
@@ -18,6 +18,7 @@ const navItems = [
   { href: '/osc', label: 'OSC Requests', icon: ClipboardList },
   { href: '/history', label: 'Change History', icon: History, noExtern: true },
   { href: '/users', label: 'User Management', icon: Users, adminOnly: true },
+  { href: '/api-integration', label: 'API Integration', icon: Plug },
   { href: '/settings', label: 'Settings', icon: Settings },
 ]
 
