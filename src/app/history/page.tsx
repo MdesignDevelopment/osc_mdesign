@@ -132,8 +132,8 @@ export default async function HistoryPage({ searchParams }: PageProps) {
             const fieldLabel = FIELD_LABELS[record.fieldChanged] ?? record.fieldChanged
             const oldVal = formatFieldValue(record.fieldChanged, record.oldValue)
             const newVal = formatFieldValue(record.fieldChanged, record.newValue)
-            const popzone = isDeleted ? (record.oldValue ?? 'Unknown') : record.oscRequest?.popzone
-            const partnerName = isDeleted ? (record.newValue ?? '') : record.oscRequest?.partner.name
+            const popzone = isDeleted ? (record.oldValue ?? 'Unknown') : (record.oscRequest?.popzone ?? 'Deleted request')
+            const partnerName = isDeleted ? (record.newValue ?? '') : (record.oscRequest?.partner?.name ?? '')
 
             if (isDeleteReason) {
               return (
@@ -201,12 +201,18 @@ export default async function HistoryPage({ searchParams }: PageProps) {
                           {fieldLabel}
                         </span>
                         <span className="text-xs text-neutral-400">on</span>
-                        <Link
-                          href={`/osc/${record.oscRequest!.id}`}
-                          className="text-xs font-medium text-blue-600 hover:text-blue-700 hover:underline"
-                        >
-                          {popzone}
-                        </Link>
+                        {record.oscRequest ? (
+                          <Link
+                            href={`/osc/${record.oscRequest.id}`}
+                            className="text-xs font-medium text-blue-600 hover:text-blue-700 hover:underline"
+                          >
+                            {popzone}
+                          </Link>
+                        ) : (
+                          <span className="text-xs font-medium text-neutral-400 line-through">
+                            {popzone}
+                          </span>
+                        )}
                       </>
                     )}
                     <span className="text-xs text-neutral-300">·</span>

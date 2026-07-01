@@ -3,7 +3,7 @@ import { prisma } from '@/lib/db'
 import { getSession } from '@/lib/auth'
 import * as XLSX from 'xlsx'
 import { parse, isValid } from 'date-fns'
-import { OscStatus, Priority } from '@prisma/client'
+import { OscStatus, Priority, Prisma } from '@prisma/client'
 
 const STATUS_MAP: Record<string, OscStatus> = {
   'osc updated': 'OSC_UPDATED',
@@ -37,6 +37,38 @@ function parseDate(val: unknown): Date | null {
   return null
 }
 
+interface RowData {
+  partner: string
+  popzone: string
+  status: string
+  priority: string
+  remark: string
+  oscRequestDate: string
+  mailSentDate: string
+  receivedDate: string
+  updatedDate: string
+}
+
+interface RowError {
+  row: number
+  message: string
+  field?: string
+  rowData?: RowData
+}
+
+interface ProcessedRow {
+  partnerId: string
+  popzone: string
+  status: OscStatus
+  priority: Priority
+  remark: string | null
+  receivedDate: Date | null
+  oscRequestDate: Date | null
+  mailSentDate: Date | null
+  updatedDate: Date | null
+  rowData: RowData
+}
+
 // GET — download a blank template
 export async function GET() {
   const session = await getSession()
@@ -65,7 +97,7 @@ export async function GET() {
   })
 }
 
-// POST — upload and import
+// POST — upload and upsert
 export async function POST(req: NextRequest) {
   const session = await getSession()
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -97,9 +129,8 @@ export async function POST(req: NextRequest) {
   const partners = await prisma.partner.findMany()
   const partnerMap = new Map(partners.map((p) => [p.name.toLowerCase().trim(), p.id]))
 
-  type CreateData = Parameters<typeof prisma.oscRequest.create>[0]['data']
-  const errors: Array<{ row: number; message: string }> = []
-  const toCreate: CreateData[] = []
+  const errors: RowError[] = []
+  const valid: ProcessedRow[] = []
 
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i]
@@ -107,51 +138,171 @@ export async function POST(req: NextRequest) {
 
     const partnerName = String(row['Partner'] ?? '').trim()
     const popzone = String(row['Pop Zone'] ?? '').trim()
-    const statusRaw = String(row['Status'] ?? '').trim().toLowerCase()
-    const priorityRaw = String(row['Priority'] ?? '').trim().toLowerCase()
+    const statusRaw = String(row['Status'] ?? '').trim()
+    const priorityRaw = String(row['Priority'] ?? '').trim()
+    const remarkRaw = String(row['Remark'] ?? '').trim()
+    const oscRequestDateRaw = String(row['OSC Request Date'] ?? '').trim()
+    const mailSentDateRaw = String(row['Mail Sent Date'] ?? '').trim()
+    const receivedDateRaw = String(row['Received Date'] ?? '').trim()
+    const updatedDateRaw = String(row['Updated Date'] ?? '').trim()
 
     if (!partnerName && !popzone) continue
 
+    const rowData: RowData = {
+      partner: partnerName,
+      popzone,
+      status: statusRaw,
+      priority: priorityRaw,
+      remark: remarkRaw,
+      oscRequestDate: oscRequestDateRaw,
+      mailSentDate: mailSentDateRaw,
+      receivedDate: receivedDateRaw,
+      updatedDate: updatedDateRaw,
+    }
+
     const partnerId = partnerMap.get(partnerName.toLowerCase())
     if (!partnerId) {
-      errors.push({ row: rowNum, message: `Unknown partner: "${partnerName}"` })
+      errors.push({ row: rowNum, message: `Unknown partner: "${partnerName}"`, field: 'partner', rowData })
       continue
     }
 
     if (!popzone) {
-      errors.push({ row: rowNum, message: 'Pop Zone is required' })
+      errors.push({ row: rowNum, message: 'Pop Zone is required', field: 'popzone', rowData })
       continue
     }
 
-    const status = STATUS_MAP[statusRaw]
+    const status = STATUS_MAP[statusRaw.toLowerCase()]
     if (!status) {
-      errors.push({ row: rowNum, message: `Invalid status: "${row['Status']}" — use: On Hold, OSC Updated, Email Sent, Email Sent + Reminder, Check Remarks` })
+      errors.push({
+        row: rowNum,
+        message: `Invalid status: "${statusRaw}" — use: On Hold, OSC Updated, Email Sent, Email Sent + Reminder, Check Remarks`,
+        field: 'status',
+        rowData,
+      })
       continue
     }
 
-    const priority = PRIORITY_MAP[priorityRaw] ?? 'NOT_DEFINED'
+    const priority = PRIORITY_MAP[priorityRaw.toLowerCase()] ?? 'NOT_DEFINED'
 
-    toCreate.push({
+    valid.push({
       partnerId,
       popzone,
       status,
       priority,
-      remark: String(row['Remark'] ?? '').trim() || null,
+      remark: remarkRaw || null,
       receivedDate: parseDate(row['Received Date']),
       oscRequestDate: parseDate(row['OSC Request Date']),
       mailSentDate: parseDate(row['Mail Sent Date']),
       updatedDate: parseDate(row['Updated Date']),
-      createdById: session.user.id,
+      rowData,
     })
   }
 
-  if (toCreate.length === 0) {
-    return NextResponse.json({ created: 0, errors }, { status: errors.length > 0 ? 422 : 400 })
+  if (valid.length === 0) {
+    return NextResponse.json({ created: 0, updated: 0, errors }, { status: errors.length > 0 ? 422 : 400 })
   }
 
-  const created = await prisma.$transaction(
-    toCreate.map((data) => prisma.oscRequest.create({ data }))
-  )
+  // Deduplicate by popzone case-insensitively — last occurrence wins
+  const rowMap = new Map<string, ProcessedRow>()
+  for (const r of valid) {
+    rowMap.set(r.popzone.toLowerCase(), r)
+  }
+  const deduped = Array.from(rowMap.values())
 
-  return NextResponse.json({ created: created.length, errors })
+  // Case-insensitive lookup with full field data for history diffing.
+  // Prisma's { in: [...] } is case-sensitive in PostgreSQL, so we use raw LOWER().
+  const lowerNames = deduped.map((r) => r.popzone.toLowerCase())
+
+  type ExistingRecord = {
+    id: string
+    popzone: string
+    status: string
+    priority: string | null
+    remark: string | null
+    receivedDate: Date | null
+    oscRequestDate: Date | null
+    mailSentDate: Date | null
+    updatedDate: Date | null
+    partnerId: string
+  }
+
+  const existingRecords = await prisma.$queryRaw<ExistingRecord[]>(
+    Prisma.sql`
+      SELECT id, popzone, status, priority, remark,
+             "receivedDate", "oscRequestDate", "mailSentDate", "updatedDate", "partnerId"
+      FROM "OscRequest"
+      WHERE LOWER(popzone) IN (${Prisma.join(lowerNames)})
+    `
+  )
+  const existingByLower = new Map(existingRecords.map((r) => [r.popzone.toLowerCase(), r]))
+
+  const toCreate = deduped.filter((r) => !existingByLower.has(r.popzone.toLowerCase()))
+  const toUpdate = deduped.filter((r) => existingByLower.has(r.popzone.toLowerCase()))
+
+  // Build history entries for every changed field on each updated row
+  type HistoryEntry = { oscRequestId: string; userId: string; fieldChanged: string; oldValue: string | null; newValue: string | null }
+  const historyEntries: HistoryEntry[] = []
+
+  for (const r of toUpdate) {
+    const ex = existingByLower.get(r.popzone.toLowerCase())!
+    const scalarFields: Array<[string, string | null, string | null]> = [
+      ['status', ex.status, r.status],
+      ['priority', ex.priority ?? null, r.priority],
+      ['remark', ex.remark, r.remark],
+      ['partnerId', ex.partnerId, r.partnerId],
+    ]
+    for (const [field, oldVal, newVal] of scalarFields) {
+      if (oldVal !== newVal) {
+        historyEntries.push({ oscRequestId: ex.id, userId: session.user.id, fieldChanged: field, oldValue: oldVal || null, newValue: newVal || null })
+      }
+    }
+    const dateFields: Array<[string, Date | null, Date | null]> = [
+      ['receivedDate', ex.receivedDate, r.receivedDate],
+      ['oscRequestDate', ex.oscRequestDate, r.oscRequestDate],
+      ['mailSentDate', ex.mailSentDate, r.mailSentDate],
+      ['updatedDate', ex.updatedDate, r.updatedDate],
+    ]
+    for (const [field, oldDate, newDate] of dateFields) {
+      const oldStr = oldDate ? new Date(oldDate).toISOString().split('T')[0] : null
+      const newStr = newDate ? newDate.toISOString().split('T')[0] : null
+      if (oldStr !== newStr) {
+        historyEntries.push({ oscRequestId: ex.id, userId: session.user.id, fieldChanged: field, oldValue: oldStr, newValue: newStr })
+      }
+    }
+  }
+
+  await prisma.$transaction([
+    prisma.oscRequest.createMany({
+      data: toCreate.map((r) => ({
+        partnerId: r.partnerId,
+        popzone: r.popzone,
+        status: r.status,
+        priority: r.priority,
+        remark: r.remark,
+        receivedDate: r.receivedDate,
+        oscRequestDate: r.oscRequestDate,
+        mailSentDate: r.mailSentDate,
+        updatedDate: r.updatedDate,
+        createdById: session.user.id,
+      })),
+    }),
+    ...toUpdate.map((r) =>
+      prisma.oscRequest.update({
+        where: { id: existingByLower.get(r.popzone.toLowerCase())!.id },
+        data: {
+          partnerId: r.partnerId,
+          status: r.status,
+          priority: r.priority,
+          remark: r.remark,
+          receivedDate: r.receivedDate,
+          oscRequestDate: r.oscRequestDate,
+          mailSentDate: r.mailSentDate,
+          updatedDate: r.updatedDate,
+        },
+      })
+    ),
+    ...historyEntries.map((h) => prisma.oscHistory.create({ data: h })),
+  ])
+
+  return NextResponse.json({ created: toCreate.length, updated: toUpdate.length, errors })
 }
