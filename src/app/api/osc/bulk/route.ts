@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { getSession } from '@/lib/auth'
 import * as XLSX from 'xlsx'
+import { readFile } from 'fs/promises'
+import { join } from 'path'
 import { parse, isValid } from 'date-fns'
 import { OscStatus, Priority, Prisma } from '@prisma/client'
 
@@ -74,22 +76,9 @@ export async function GET() {
   const session = await getSession()
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const wb = XLSX.utils.book_new()
-  const ws = XLSX.utils.aoa_to_sheet([
-    ['Partner', 'Pop Zone', 'Status', 'Priority', 'Remark', 'OSC Request Date', 'Mail Sent Date', 'Received Date', 'Updated Date'],
-    ['Partner Name', 'MRO_CITY_01_POP_001', 'On Hold', 'High Priority', 'Example remark', '01/01/2025', '', '', ''],
-  ])
+  const file = await readFile(join(process.cwd(), 'public/osc-bulk-template.xlsx'))
 
-  ws['!cols'] = [
-    { wch: 22 }, { wch: 24 }, { wch: 22 }, { wch: 16 },
-    { wch: 40 }, { wch: 18 }, { wch: 16 }, { wch: 16 }, { wch: 16 },
-  ]
-
-  XLSX.utils.book_append_sheet(wb, ws, 'OSC Bulk Import')
-
-  const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' })
-
-  return new NextResponse(buffer, {
+  return new NextResponse(file, {
     headers: {
       'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       'Content-Disposition': 'attachment; filename="osc-bulk-template.xlsx"',
