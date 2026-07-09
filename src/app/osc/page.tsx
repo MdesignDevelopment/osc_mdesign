@@ -40,6 +40,8 @@ function buildOrderBy(sort?: string, dir?: string) {
       return [{ oscRequestDate: { sort: d, nulls: 'last' as const } }]
     case 'mailSentDate':
       return [{ mailSentDate: { sort: d, nulls: 'last' as const } }]
+    case 'updatedDate':
+      return [{ updatedDate: { sort: d, nulls: 'last' as const } }, { updatedAt: d }]
     case 'remark':
       return [{ remark: { sort: d, nulls: 'last' as const } }]
     default:
