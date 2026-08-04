@@ -1,5 +1,7 @@
 import { prisma } from '@/lib/db'
 import { getSession } from '@/lib/auth'
+import { can } from '@/lib/permissions'
+import { Role } from '@prisma/client'
 import { redirect, notFound } from 'next/navigation'
 import { OscForm } from '@/components/osc/osc-form'
 import Link from 'next/link'
@@ -8,7 +10,7 @@ import { ChevronRight } from 'lucide-react'
 export default async function EditOscPage({ params }: { params: { id: string } }) {
   const session = await getSession()
   if (!session) redirect('/login')
-  if (session.user.role === 'EXTERN') redirect('/osc')
+  if (!can(session.user.role as Role, 'osc:write')) redirect('/osc')
 
   const [request, partners] = await Promise.all([
     prisma.oscRequest.findUnique({

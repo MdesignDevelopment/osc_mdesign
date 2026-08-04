@@ -12,6 +12,44 @@ enum Role {
   ADMIN
   SUPPORT_ENGINEER
   EXTERN
+  WM_SUPPORT_ENGINEER // Wyer/Merkator Support Engineer
+}
+
+enum AddressRequestStatus {
+  NOT_STARTED
+  ON_HOLD
+  BLOCKED
+  COMPLETED
+}
+
+enum AuditEntity {
+  DESIGN_SESSION
+  ADDRESS_REQUEST
+}
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+}
+
+enum ScriptStatus {
+  SUCCESS
+  FAILED
+  PARTIAL
+  RUNNING
+}
+
+// Where a design session sits in the Wyer/Merkator workflow. Stored and picked
+// by hand, NOT derived from the four boolean flags below — those track separate
+// facts about the same session and move independently of it.
+// Declared in workflow order, not alphabetically: Postgres sorts an enum by
+// declaration order, so `ORDER BY stage` is the workflow order for free and the
+// list needs no CASE expression (which Prisma could not express anyway).
+enum DesignStage {
+  IN_SESSION
+  ON_REPORT_3
+  POSTED
 }
 
 enum OscStatus {
@@ -42,6 +80,12 @@ model User {
   oscRequests OscRequest[] @relation("CreatedBy")
   comments    OscComment[]
   history     OscHistory[]
+
+  designSessions    DesignSession[]   @relation("DesignSessionCreatedBy")
+  addressRequests   AddressRequest[]  @relation("AddressCreatedBy")
+  addressesReported AddressRequest[]  @relation("AddressReportedBy")
+  scriptExecutions  ScriptExecution[] @relation("ScriptExecutedBy")
+  auditLogs         AuditLog[]        @relation("AuditActor")
 }
 
 model Partner {
@@ -52,24 +96,29 @@ model Partner {
 }
 
 model OscRequest {
-  id             String     @id @default(cuid())
+  id             String    @id @default(cuid())
   receivedDate   DateTime?
   partnerId      String
-  partner        Partner    @relation(fields: [partnerId], references: [id])
+  partner        Partner   @relation(fields: [partnerId], references: [id])
   popzone        String
   priority       Priority?
-  status         OscStatus  @default(ON_HOLD)
-  remark         String?    @db.Text
+  status         OscStatus @default(ON_HOLD)
+  remark         String?   @db.Text
   updatedDate    DateTime?
   oscRequestDate DateTime?
   mailSentDate   DateTime?
   createdById    String
-  createdBy      User       @relation("CreatedBy", fields: [createdById], references: [id])
-  createdAt      DateTime   @default(now())
-  updatedAt      DateTime   @updatedAt
+  createdBy      User      @relation("CreatedBy", fields: [createdById], references: [id])
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
   comments OscComment[]
   history  OscHistory[]
+
+  // Required by the OSC Status projection on the Design Session Tracker.
+  // A matching expression index on upper(btrim(popzone)) is added by migration SQL.
+  @@index([popzone])
+  @@index([status])
 }
 
 model OscComment {
@@ -93,4 +142,124 @@ model OscHistory {
   oldValue     String?
   newValue     String?
   changedAt    DateTime    @default(now())
+}
+
+// ---------------------------------------------------------------------------
+// Design Session Tracker  (see SPEC-WYER-MERKATOR.md §3.2 / §6)
+// ---------------------------------------------------------------------------
+
+model DesignSession {
+  id String @id @default(cuid())
+
+  popZone     String // as entered, e.g. "MRO_HAALTERT_01_POP_011"
+  popZoneKey  String // normalised upper(trim(popZone)) — join/dedup key, never user-editable
+  cabinetName String? // e.g. "H70CA03HA06"
+  mroPartner  String? // e.g. "ZTE" — plain text, not an FK to Partner (spec §3.2)
+  notes       String? @db.Text
+  actionsDone String? @db.Text
+
+  stage DesignStage @default(IN_SESSION)
+
+  // Independent of `stage` — a session can be at any stage with any combination
+  // of these set. `posted` and DesignStage.POSTED are deliberately separate.
+  sendOcRequestToPartner Boolean @default(false)
+  aapOnHold              Boolean @default(false)
+  readyToPost            Boolean @default(false)
+  posted                 Boolean @default(false)
+
+  createdById String
+  createdBy   User     @relation("DesignSessionCreatedBy", fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  scripts ScriptExecution[]
+
+  @@unique([popZoneKey])
+  @@index([stage])
+  @@index([posted, readyToPost])
+  @@index([mroPartner])
+  @@index([updatedAt])
+}
+
+model ScriptExecution {
+  id String @id @default(cuid())
+
+  popZoneKey      String // normalised; the durable link (scripts may predate the session)
+  designSessionId String?
+  designSession   DesignSession? @relation(fields: [designSessionId], references: [id], onDelete: SetNull)
+
+  scriptName    String
+  scriptVersion String?
+  status        ScriptStatus
+  executedAt    DateTime
+  durationMs    Int?
+  output        String?      @db.Text // truncated to 64 KB at ingest
+  externalRef   String?      @unique // idempotency key from the runner
+
+  executedByLabel String? // external actor, e.g. "ci-runner-03"
+  executedById    String?
+  executedBy      User?   @relation("ScriptExecutedBy", fields: [executedById], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([popZoneKey, executedAt])
+  @@index([designSessionId])
+}
+
+// ---------------------------------------------------------------------------
+// Addresses Tracker  (see SPEC-WYER-MERKATOR.md §3.4 / §7)
+// ---------------------------------------------------------------------------
+
+model AddressRequest {
+  id String @id @default(cuid())
+
+  requestDate  DateTime
+  reporter     String
+  reportedById String?
+  reportedBy   User?    @relation("AddressReportedBy", fields: [reportedById], references: [id])
+
+  tinaUuid       String?
+  aapId          String?
+  status         AddressRequestStatus @default(NOT_STARTED)
+  notes          String?              @db.Text
+  completionDate DateTime?
+
+  createdById String
+  createdBy   User     @relation("AddressCreatedBy", fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // CHECK constraints (at-least-one identifier, completion invariant) are added
+  // by migration SQL — Prisma cannot express them.
+  @@index([status, requestDate])
+  @@index([tinaUuid])
+  @@index([aapId])
+  @@index([requestDate])
+}
+
+// ---------------------------------------------------------------------------
+// Generic audit trail for the new modules  (see SPEC-WYER-MERKATOR.md §3.5 / §5)
+// OscHistory is intentionally left untouched.
+// ---------------------------------------------------------------------------
+
+model AuditLog {
+  id String @id @default(cuid())
+
+  entity      AuditEntity
+  entityId    String // deliberately NOT an FK — audit rows outlive their subject
+  entityLabel String // snapshot at write time, so deleted records stay readable
+
+  userId String
+  user   User   @relation("AuditActor", fields: [userId], references: [id])
+
+  action       AuditAction
+  fieldChanged String? // null for CREATE / DELETE summary rows
+  oldValue     String?     @db.Text
+  newValue     String?     @db.Text
+  changedAt    DateTime    @default(now())
+
+  @@index([entity, entityId, changedAt])
+  @@index([userId, changedAt])
+  @@index([entity, changedAt])
+  @@index([changedAt])
 }

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
-import { getSession } from '@/lib/auth'
+import { authorize } from '@/lib/api-auth'
 import { parse, isValid } from 'date-fns'
 import { OscStatus, Priority } from '@prisma/client'
 
@@ -37,9 +37,9 @@ function parseDate(val: unknown): Date | null {
 
 // POST — upsert a single corrected row from the inline fix form
 export async function POST(req: NextRequest) {
-  const session = await getSession()
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (session.user.role === 'EXTERN') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  const auth = await authorize('osc:write')
+  if (!auth.ok) return auth.response
+  const { session } = auth
 
   const body = await req.json()
 

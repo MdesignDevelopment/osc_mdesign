@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
-import { getSession } from '@/lib/auth'
+import { authorize } from '@/lib/api-auth'
 import { commentSchema } from '@/lib/validations'
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
-  const session = await getSession()
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  // Its own capability, not osc:read: commenting is a write to OSC data, so a
+  // role granted read-only OSC visibility (WM_SUPPORT_ENGINEER) must not get it
+  // for free. EXTERN reviewers keep it.
+  const auth = await authorize('osc:comment')
+  if (!auth.ok) return auth.response
+  const { session } = auth
 
   const body = await req.json()
   const parsed = commentSchema.safeParse(body)

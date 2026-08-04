@@ -4,8 +4,10 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { Session } from 'next-auth'
-import { LayoutDashboard, ClipboardList, Users, History, Settings, Plug, X } from 'lucide-react'
-import { cn, avatarColor, ROLE_LABELS } from '@/lib/utils'
+import { LayoutDashboard, ClipboardList, LayoutGrid, MapPin, Users, History, Settings, Plug, X } from 'lucide-react'
+import { cn, avatarColor, ROLE_LABELS_SHORT } from '@/lib/utils'
+import { can, canAny, AUDIT_CAPABILITIES, type Capability } from '@/lib/permissions'
+import { Role } from '@prisma/client'
 
 interface SidebarProps {
   session: Session
@@ -13,19 +15,34 @@ interface SidebarProps {
   onClose: () => void
 }
 
-const navItems = [
-  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/osc', label: 'OSC Requests', icon: ClipboardList },
-  { href: '/history', label: 'Change History', icon: History, noExtern: true },
-  { href: '/users', label: 'User Management', icon: Users, adminOnly: true },
-  { href: '/api-integration', label: 'API Integration', icon: Plug },
-  { href: '/settings', label: 'Settings', icon: Settings },
+// Nav visibility is capability-driven, not role-driven: a new role declares its
+// capabilities once in lib/permissions and the nav follows. The previous
+// `adminOnly` / `noExtern` flags meant every new role saw everything by default.
+// See SPEC-WYER-MERKATOR.md §4.5.
+type NavItem = {
+  href: string
+  label: string
+  icon: typeof LayoutDashboard
+  /** Required capability; `null` means every signed-in user. */
+  capability: Capability | null
+  /** Visible when the role holds ANY of these (used by the history page). */
+  anyCapability?: readonly Capability[]
+}
+
+const navItems: NavItem[] = [
+  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, capability: 'osc:read' },
+  { href: '/osc', label: 'OSC Requests', icon: ClipboardList, capability: 'osc:read' },
+  { href: '/design-sessions', label: 'Design Sessions', icon: LayoutGrid, capability: 'design:read' },
+  { href: '/addresses', label: 'Addresses', icon: MapPin, capability: 'address:read' },
+  { href: '/history', label: 'Change History', icon: History, capability: null, anyCapability: AUDIT_CAPABILITIES },
+  { href: '/users', label: 'User Management', icon: Users, capability: 'users:manage' },
+  { href: '/api-integration', label: 'API Integration', icon: Plug, capability: 'api:integration' },
+  { href: '/settings', label: 'Settings', icon: Settings, capability: null },
 ]
 
 export function Sidebar({ session, open, onClose }: SidebarProps) {
   const pathname = usePathname()
-  const isAdmin = session.user.role === 'ADMIN'
-  const isExtern = session.user.role === 'EXTERN'
+  const role = session.user.role as Role
   const userInitial = session.user.name?.charAt(0).toUpperCase() ?? '?'
   const bgColor = avatarColor(session.user.name ?? 'U')
 
@@ -54,8 +71,8 @@ export function Sidebar({ session, open, onClose }: SidebarProps) {
         {/* Nav */}
         <nav className="flex-1 px-2 py-3 space-y-0.5 overflow-y-auto">
           {navItems.map((item) => {
-            if (item.adminOnly && !isAdmin) return null
-            if ('noExtern' in item && item.noExtern && isExtern) return null
+            if (item.anyCapability ? !canAny(role, item.anyCapability) : false) return null
+            if (item.capability && !can(role, item.capability)) return null
             const Icon = item.icon
             const active = pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(item.href))
             return (
@@ -86,7 +103,7 @@ export function Sidebar({ session, open, onClose }: SidebarProps) {
             <div className="min-w-0">
               <p className="text-white/80 text-xs font-medium truncate">{session.user.name}</p>
               <p className="text-white/30 text-[11px] truncate">
-                {ROLE_LABELS[session.user.role as keyof typeof ROLE_LABELS]}
+                {ROLE_LABELS_SHORT[role]}
               </p>
             </div>
           </div>

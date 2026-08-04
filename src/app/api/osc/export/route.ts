@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
-import { getSession } from '@/lib/auth'
+import { authorize } from '@/lib/api-auth'
 import * as XLSX from 'xlsx'
 import { format } from 'date-fns'
 
@@ -25,8 +25,8 @@ function fmt(date: Date | null | undefined): string {
 }
 
 export async function GET() {
-  const session = await getSession()
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const auth = await authorize('osc:read')
+  if (!auth.ok) return auth.response
   const requests = await prisma.oscRequest.findMany({
     orderBy: [
       { priority: { sort: 'asc', nulls: 'last' } },

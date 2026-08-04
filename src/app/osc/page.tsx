@@ -4,7 +4,9 @@ import { redirect } from 'next/navigation'
 import { OscTable } from '@/components/osc/osc-table'
 import Link from 'next/link'
 import { Plus, Download } from 'lucide-react'
-import { OscStatus, Priority } from '@prisma/client'
+import { OscStatus, Priority, Role } from '@prisma/client'
+import { can } from '@/lib/permissions'
+import { duplicatePopZoneValues } from '@/lib/duplicate-popzones'
 
 interface PageProps {
   searchParams: {
@@ -12,6 +14,7 @@ interface PageProps {
     status?: string
     partner?: string
     priority?: string
+    dupes?: string
     page?: string
     sort?: string
     dir?: string
@@ -58,6 +61,11 @@ export default async function OscListPage({ searchParams }: PageProps) {
   const page = Math.max(1, parseInt(searchParams.page ?? '1'))
   const skip = (page - 1) * PAGE_SIZE
 
+  // Only paid for when the filter is on — it is a full scan of OscRequest.popzone.
+  // The stored spellings are matched rather than the normalised key, because
+  // Prisma cannot filter on upper(btrim(popzone)).
+  const dupePopzones = searchParams.dupes === '1' ? await duplicatePopZoneValues() : undefined
+
   const where = {
     ...(searchParams.search && {
       OR: [
@@ -69,6 +77,7 @@ export default async function OscListPage({ searchParams }: PageProps) {
     ...(searchParams.status && { status: searchParams.status as OscStatus }),
     ...(searchParams.partner && { partnerId: searchParams.partner }),
     ...(searchParams.priority && { priority: searchParams.priority as Priority }),
+    ...(dupePopzones && { popzone: { in: dupePopzones } }),
   }
 
   const [requests, total, partners] = await Promise.all([
@@ -83,7 +92,7 @@ export default async function OscListPage({ searchParams }: PageProps) {
     prisma.partner.findMany({ orderBy: { name: 'asc' } }),
   ])
 
-  const canCreate = session.user.role === 'ADMIN' || session.user.role === 'SUPPORT_ENGINEER'
+  const canCreate = can(session.user.role as Role, 'osc:write')
 
   return (
     <div className="space-y-4">

@@ -3,6 +3,7 @@ import CredentialsProvider from 'next-auth/providers/credentials'
 import bcrypt from 'bcryptjs'
 import { prisma } from '@/lib/db'
 import { Role } from '@prisma/client'
+import { can, type Capability } from '@/lib/permissions'
 
 export const authOptions: NextAuthOptions = {
   session: { strategy: 'jwt' },
@@ -89,5 +90,16 @@ export const requireAuth = async () => {
 export const requireRole = async (roles: Role[]) => {
   const session = await requireAuth()
   if (!roles.includes(session.user.role as Role)) throw new Error('Forbidden')
+  return session
+}
+
+/**
+ * Throwing capability guard, for server components and actions.
+ * API routes should use `authorize()` from lib/api-auth, which returns a
+ * response instead of throwing and matches the existing route style.
+ */
+export const requireCapability = async (cap: Capability) => {
+  const session = await requireAuth()
+  if (!can(session.user.role as Role, cap)) throw new Error('Forbidden')
   return session
 }

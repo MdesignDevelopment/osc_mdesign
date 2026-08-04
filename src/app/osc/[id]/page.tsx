@@ -8,7 +8,8 @@ import Link from 'next/link'
 import { Pencil, ChevronRight } from 'lucide-react'
 import { formatDate } from '@/lib/utils'
 import { StatusLozenge, PriorityLozenge } from '@/components/ui/lozenge'
-import { OscStatus, Priority } from '@prisma/client'
+import { OscStatus, Priority, Role } from '@prisma/client'
+import { can } from '@/lib/permissions'
 
 export default async function OscDetailPage({ params }: { params: { id: string } }) {
   noStore()
@@ -33,7 +34,11 @@ export default async function OscDetailPage({ params }: { params: { id: string }
 
   if (!request) notFound()
 
-  const canEdit = session.user.role === 'ADMIN' || session.user.role === 'SUPPORT_ENGINEER'
+  const canEdit = can(session.user.role as Role, 'osc:write')
+  const canDelete = can(session.user.role as Role, 'osc:delete')
+  // Was hardcoded true, so the compose box rendered even for roles the API
+  // rejects. Now it tracks the capability.
+  const canComment = can(session.user.role as Role, 'osc:comment')
 
   return (
     <div className="space-y-4">
@@ -50,13 +55,15 @@ export default async function OscDetailPage({ params }: { params: { id: string }
         <div className="flex-1 min-w-0 space-y-4">
           <div className="flex items-start justify-between gap-3">
             <h1 className="text-2xl font-bold text-slate-900 leading-tight">{request.popzone}</h1>
-            {canEdit && (
+            {(canEdit || canDelete) && (
               <div className="flex items-center gap-2 flex-shrink-0">
-                <Link href={`/osc/${params.id}/edit`} className="jira-btn-secondary text-xs">
-                  <Pencil className="w-3.5 h-3.5" />
-                  Edit
-                </Link>
-                <DeleteOscButton id={params.id} />
+                {canEdit && (
+                  <Link href={`/osc/${params.id}/edit`} className="jira-btn-secondary text-xs">
+                    <Pencil className="w-3.5 h-3.5" />
+                    Edit
+                  </Link>
+                )}
+                {canDelete && <DeleteOscButton id={params.id} />}
               </div>
             )}
           </div>
@@ -75,7 +82,7 @@ export default async function OscDetailPage({ params }: { params: { id: string }
             comments={request.comments}
             history={request.history}
             currentUser={{ id: session.user.id, role: session.user.role }}
-            canComment={true}
+            canComment={canComment}
           />
         </div>
 

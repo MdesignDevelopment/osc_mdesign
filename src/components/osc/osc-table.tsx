@@ -104,7 +104,7 @@ export function OscTable({ requests, partners, total, page, pageSize, searchPara
   // Clear selection when page or filters change
   useEffect(() => {
     setSelectedIds(new Set())
-  }, [page, searchParams.search, searchParams.status, searchParams.partner, searchParams.priority, searchParams.sort])
+  }, [page, searchParams.search, searchParams.status, searchParams.partner, searchParams.priority, searchParams.dupes, searchParams.sort])
 
   // Sync indeterminate state on select-all checkbox
   useEffect(() => {
@@ -223,6 +223,7 @@ export function OscTable({ requests, partners, total, page, pageSize, searchPara
     searchParams.status ||
     searchParams.partner ||
     searchParams.priority ||
+    searchParams.dupes ||
     searchParams.sort
 
   const totalPages = Math.ceil(total / pageSize)
@@ -281,6 +282,22 @@ export function OscTable({ requests, partners, total, page, pageSize, searchPara
             <option value="HIGH_PRIO">High Priority</option>
             <option value="LOW_PRIO">Low Priority</option>
           </select>
+
+          {/* PopZone is not unique here by design — repeat requests over time are
+              legitimate — which is also what accidental double entry looks like.
+              This narrows the list to zones carrying more than one request. */}
+          <label
+            className="flex items-center gap-2 text-xs text-neutral-600 dark:text-neutral-400 cursor-pointer px-1"
+            title="Only popzones with more than one OSC request"
+          >
+            <input
+              type="checkbox"
+              checked={searchParams.dupes === '1'}
+              onChange={(e) => setParam('dupes', e.target.checked ? '1' : '')}
+              className="w-3.5 h-3.5 rounded border-neutral-300 dark:border-neutral-600 text-blue-600 cursor-pointer accent-blue-600"
+            />
+            Duplicate popzones
+          </label>
 
           {hasFilters && (
             <button onClick={clearFilters} className="jira-btn-secondary py-2 text-xs gap-1">

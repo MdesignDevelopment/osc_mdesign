@@ -65,6 +65,26 @@ async function main() {
   })
   console.log('Created admin:', admin.email)
 
+  // QA user for the Wyer/Merkator Support Engineer role. Only seeded when a
+  // password is supplied, so production seeds do not create an extra account.
+  // Requires the add_wm_support_engineer_role migration to have been applied.
+  const wmSeedPassword = process.env.WM_SEED_PASSWORD
+  if (wmSeedPassword) {
+    const wm = await prisma.user.upsert({
+      where: { email: 'wm.support@mdesign.ma' },
+      update: {},
+      create: {
+        name: 'Wyer/Merkator Support',
+        email: 'wm.support@mdesign.ma',
+        password: await bcrypt.hash(wmSeedPassword, 12),
+        role: Role.WM_SUPPORT_ENGINEER,
+      },
+    })
+    console.log('Created Wyer/Merkator support engineer:', wm.email)
+  } else {
+    console.log('WM_SEED_PASSWORD not set — skipping Wyer/Merkator QA user.')
+  }
+
   // Seed partners
   const partnerMap: Record<string, string> = {}
   for (const name of PARTNERS) {

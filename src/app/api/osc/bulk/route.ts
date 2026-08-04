@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
-import { getSession } from '@/lib/auth'
+import { authorize } from '@/lib/api-auth'
 import * as XLSX from 'xlsx'
 import { parse, isValid } from 'date-fns'
 import { OscStatus, Priority, Prisma } from '@prisma/client'
@@ -71,8 +71,8 @@ interface ProcessedRow {
 
 // GET — download a blank template
 export async function GET() {
-  const session = await getSession()
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const auth = await authorize('osc:write')
+  if (!auth.ok) return auth.response
 
   const wb = XLSX.utils.book_new()
   const ws = XLSX.utils.aoa_to_sheet([
@@ -99,9 +99,9 @@ export async function GET() {
 
 // POST — upload and upsert
 export async function POST(req: NextRequest) {
-  const session = await getSession()
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (session.user.role === 'EXTERN') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  const auth = await authorize('osc:write')
+  if (!auth.ok) return auth.response
+  const { session } = auth
 
   const formData = await req.formData()
   const file = formData.get('file') as File | null

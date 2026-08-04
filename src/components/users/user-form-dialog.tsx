@@ -5,7 +5,10 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { userCreateSchema, userUpdateSchema, UserCreateInput, UserUpdateInput } from '@/lib/validations'
 import { Role } from '@prisma/client'
+import { ROLE_LABELS } from '@/lib/utils'
 import { X, Loader2 } from 'lucide-react'
+
+const ROLE_OPTIONS = Object.keys(ROLE_LABELS) as Role[]
 
 interface UserRow {
   id: string
@@ -118,10 +121,12 @@ export function UserFormDialog({ open, user, onClose, onSuccess }: UserFormDialo
           </Field>
 
           <Field label="Role *" error={e.role?.message}>
+            {/* Driven off ROLE_LABELS so a new Role enum value shows up here
+                automatically instead of being silently unassignable. */}
             <select {...register('role')} className="jira-input">
-              <option value="ADMIN">Admin</option>
-              <option value="SUPPORT_ENGINEER">Support Engineer</option>
-              <option value="EXTERN">External</option>
+              {ROLE_OPTIONS.map((r) => (
+                <option key={r} value={r}>{ROLE_LABELS[r]}</option>
+              ))}
             </select>
           </Field>
 

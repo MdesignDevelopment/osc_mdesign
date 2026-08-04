@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
-import { getSession } from '@/lib/auth'
+import { authorize } from '@/lib/api-auth'
 import { oscRequestSchema } from '@/lib/validations'
 
 export async function GET(_: NextRequest, { params }: { params: { id: string } }) {
-  const session = await getSession()
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const auth = await authorize('osc:read')
+  if (!auth.ok) return auth.response
 
   const request = await prisma.oscRequest.findUnique({
     where: { id: params.id },
@@ -22,9 +22,9 @@ export async function GET(_: NextRequest, { params }: { params: { id: string } }
 }
 
 export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
-  const session = await getSession()
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (session.user.role === 'EXTERN') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  const auth = await authorize('osc:write')
+  if (!auth.ok) return auth.response
+  const { session } = auth
 
   const existing = await prisma.oscRequest.findUnique({ where: { id: params.id } })
   if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 })
@@ -93,9 +93,9 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
 }
 
 export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
-  const session = await getSession()
-  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (session.user.role === 'EXTERN') return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  const auth = await authorize('osc:delete')
+  if (!auth.ok) return auth.response
+  const { session } = auth
 
   const request = await prisma.oscRequest.findUnique({
     where: { id: params.id },
