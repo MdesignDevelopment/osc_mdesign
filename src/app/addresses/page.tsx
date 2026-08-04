@@ -2,7 +2,7 @@ import { prisma } from '@/lib/db'
 import { getSession } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import { Plus } from 'lucide-react'
+import { Plus, Upload } from 'lucide-react'
 import { Role } from '@prisma/client'
 import { can } from '@/lib/permissions'
 import { buildAddressWhere, buildAddressOrderBy } from '@/lib/addresses'
@@ -60,10 +60,16 @@ export default async function AddressesPage({ searchParams }: PageProps) {
           </p>
         </div>
         {canWrite && (
-          <Link href="/addresses/new" className="jira-btn-primary text-xs">
-            <Plus className="w-3.5 h-3.5" />
-            New Request
-          </Link>
+          <div className="flex items-center gap-2">
+            <Link href="/addresses/import" className="jira-btn-secondary text-xs">
+              <Upload className="w-3.5 h-3.5" />
+              Bulk Import
+            </Link>
+            <Link href="/addresses/new" className="jira-btn-primary text-xs">
+              <Plus className="w-3.5 h-3.5" />
+              New Request
+            </Link>
+          </div>
         )}
       </div>
 

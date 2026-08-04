@@ -404,7 +404,7 @@ export function DesignSessionTable({
                     <td className="jira-table-cell">
                       <Link
                         href={`/design-sessions/${row.id}`}
-                        className="font-medium text-blue-600 hover:underline font-mono text-xs"
+                        className="font-medium text-blue-600 hover:underline font-mono"
                       >
                         {row.popZone}
                       </Link>
@@ -420,7 +420,7 @@ export function DesignSessionTable({
                       saving={rowBusy}
                       ariaLabel={`Cabinet — ${row.popZone}`}
                       display={values.cabinetName ?? undefined}
-                      className="font-mono text-xs text-neutral-600"
+                      className="font-mono text-neutral-600"
                       onCommit={(v) => patch(row, { cabinetName: v || null })}
                     />
 
