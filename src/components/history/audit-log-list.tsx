@@ -3,7 +3,7 @@ import { AuditEntity, AuditAction, Role } from '@prisma/client'
 import { ArrowRight, ExternalLink, History, Plus, Trash2 } from 'lucide-react'
 import {
   cn, formatDate, formatDateTime, avatarColor,
-  ROLE_LABELS, ROLE_LOZENGE, ADDRESS_STATUS_LABELS, DESIGN_STAGE_LABELS,
+  ROLE_LABELS, ROLE_LOZENGE, formatAddressAuditValue, DESIGN_STAGE_LABELS,
 } from '@/lib/utils'
 import { auditEntityHref, auditFieldLabels, AUDIT_ENTITY_LABELS } from '@/lib/audit'
 import { EmptyState } from '@/components/shared/table-parts'
@@ -23,8 +23,9 @@ export interface AuditRow {
 
 function formatValue(entity: AuditEntity, field: string | null, value: string | null): string {
   if (!value) return '—'
-  if (entity === 'ADDRESS_REQUEST' && field === 'status') {
-    return ADDRESS_STATUS_LABELS[value as keyof typeof ADDRESS_STATUS_LABELS] ?? value
+  // Covers `action` and the legacy `status` rows behind it.
+  if (entity === 'ADDRESS_REQUEST' && (field === 'action' || field === 'status')) {
+    return formatAddressAuditValue(field, value)
   }
   if (entity === 'DESIGN_SESSION' && field === 'stage') {
     return DESIGN_STAGE_LABELS[value as keyof typeof DESIGN_STAGE_LABELS] ?? value

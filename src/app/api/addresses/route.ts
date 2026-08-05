@@ -3,7 +3,7 @@ import { prisma } from '@/lib/db'
 import { authorize, validationError } from '@/lib/api-auth'
 import { addressRequestSchema } from '@/lib/validations'
 import { auditRows, initialFields, ADDRESS_REQUEST_FIELDS } from '@/lib/audit'
-import { addressLabel, buildAddressWhere, resolveCompletion } from '@/lib/addresses'
+import { addressLabel, buildAddressWhere } from '@/lib/addresses'
 import { Prisma } from '@prisma/client'
 
 export async function GET(req: NextRequest) {
@@ -34,21 +34,16 @@ export async function POST(req: NextRequest) {
 
   const { expectedUpdatedAt: _ignored, ...input } = parsed.data
 
-  // A COMPLETED request with no date supplied defaults to today (spec §7.4).
-  const { status, completionDate } = resolveCompletion({
-    status: input.status,
-    completionDate: input.completionDate ?? null,
-  })
-
   const data: Prisma.AddressRequestUncheckedCreateInput = {
     requestDate: new Date(input.requestDate),
-    reporter: input.reporter.trim(),
+    reporter: input.reporter?.trim() || null,
     reportedById: input.reportedById || null,
+    popName: input.popName?.trim() || null,
     tinaUuid: input.tinaUuid?.trim() || null,
     aapId: input.aapId?.trim() || null,
-    status,
+    action: input.action,
     notes: input.notes?.trim() || null,
-    completionDate,
+    completionDate: input.completionDate ? new Date(input.completionDate) : null,
     createdById: session.user.id,
   }
 

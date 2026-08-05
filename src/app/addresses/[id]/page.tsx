@@ -8,22 +8,13 @@ import { Role } from '@prisma/client'
 import { can } from '@/lib/permissions'
 import { addressLabel } from '@/lib/addresses'
 import {
-  formatDate, formatDateTime,
-  ADDRESS_STATUS_LABELS, ADDRESS_STATUS_LOZENGE,
+  formatDate, formatDateTime, formatAddressAuditValue,
+  ADDRESS_ACTION_LABELS, ADDRESS_ACTION_LOZENGE,
 } from '@/lib/utils'
 import { Lozenge } from '@/components/ui/lozenge'
 import { AuditTimeline } from '@/components/shared/audit-timeline'
 import { DeleteRecordButton } from '@/components/shared/delete-record-button'
 import { ADDRESS_REQUEST_FIELD_LABELS } from '@/lib/audit'
-
-/** Renders a stored audit string for display (enum keys → human labels). */
-function formatAuditValue(field: string | null, value: string): string {
-  if (field === 'status') {
-    return ADDRESS_STATUS_LABELS[value as keyof typeof ADDRESS_STATUS_LABELS] ?? value
-  }
-  if (field === 'requestDate' || field === 'completionDate') return formatDate(value)
-  return value
-}
 
 export default async function AddressDetailPage({ params }: { params: { id: string } }) {
   noStore()
@@ -68,7 +59,7 @@ export default async function AddressDetailPage({ params }: { params: { id: stri
             <div className="min-w-0">
               <h1 className="text-2xl font-bold text-slate-900 leading-tight break-all">{label}</h1>
               <p className="text-sm text-slate-400 mt-0.5">
-                Reported by {record.reporter}
+                {record.reporter ? `Reported by ${record.reporter}` : 'No reporter recorded'}
               </p>
             </div>
             {(canEdit || canDelete) && (
@@ -103,7 +94,7 @@ export default async function AddressDetailPage({ params }: { params: { id: stri
           <AuditTimeline
             entries={history}
             fieldLabels={ADDRESS_REQUEST_FIELD_LABELS}
-            formatValue={formatAuditValue}
+            formatValue={formatAddressAuditValue}
             subjectNoun="address request"
           />
         </div>
@@ -111,9 +102,9 @@ export default async function AddressDetailPage({ params }: { params: { id: stri
         {/* Right: metadata */}
         <div className="w-full lg:w-60 flex-shrink-0">
           <div className="jira-panel divide-y divide-slate-50">
-            <SidebarField label="Status">
-              <Lozenge color={ADDRESS_STATUS_LOZENGE[record.status]}>
-                {ADDRESS_STATUS_LABELS[record.status]}
+            <SidebarField label="Action">
+              <Lozenge color={ADDRESS_ACTION_LOZENGE[record.action]}>
+                {ADDRESS_ACTION_LABELS[record.action]}
               </Lozenge>
             </SidebarField>
             <SidebarField label="Request Date">
@@ -123,10 +114,15 @@ export default async function AddressDetailPage({ params }: { params: { id: stri
               <span className="text-sm text-slate-800 tabular-nums">{formatDate(record.completionDate)}</span>
             </SidebarField>
             <SidebarField label="Reporter">
-              <span className="text-sm text-slate-800">{record.reporter}</span>
+              <span className="text-sm text-slate-800">{record.reporter ?? '—'}</span>
               {record.reportedBy && (
                 <span className="block text-[11px] text-slate-400">{record.reportedBy.name}</span>
               )}
+            </SidebarField>
+            <SidebarField label="POP Name">
+              <span className="text-sm text-slate-800 font-mono break-all">
+                {record.popName ?? '—'}
+              </span>
             </SidebarField>
             <SidebarField label="Tina UUID">
               <span className="text-sm text-slate-800 font-mono text-xs break-all">

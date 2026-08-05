@@ -1,43 +1,20 @@
-import { Prisma, AddressRequestStatus } from '@prisma/client'
+import { Prisma, AddressAction } from '@prisma/client'
 
 // Shared query + business rules for the Addresses Tracker, so the list page and
-// the API routes cannot drift apart on filtering or the completion invariant.
+// the API routes cannot drift apart on filtering or validation.
 // See SPEC-WYER-MERKATOR.md §7.
+//
+// The completion invariant that used to live here went away with the COMPLETED
+// status (migration 20260805000001). `completionDate` is now an ordinary
+// optional date: nothing auto-fills it, nothing clears it, and no state depends
+// on it. The only rule left is that it cannot precede the request date.
 
 /** Human label for a request: whichever external identifier it carries. */
 export function addressLabel(r: { tinaUuid: string | null; aapId: string | null }): string {
   return r.tinaUuid?.trim() || r.aapId?.trim() || 'Untitled request'
 }
 
-export const OPEN_STATUSES: readonly AddressRequestStatus[] = ['NOT_STARTED', 'ON_HOLD', 'BLOCKED']
-
-export function isOpenStatus(status: AddressRequestStatus): boolean {
-  return status !== 'COMPLETED'
-}
-
-/**
- * Reconcile status and completion date (spec §7.4).
- *
- * - COMPLETED with no date  → defaults to today, so the DB CHECK constraint can
- *   never be the thing that surfaces this to the user.
- * - Moving away from COMPLETED → the caller decides whether to clear the date;
- *   `clearCompletionDate` makes that explicit rather than implicit.
- */
-export function resolveCompletion(input: {
-  status: AddressRequestStatus
-  completionDate: string | Date | null
-  clearCompletionDate?: boolean
-}): { status: AddressRequestStatus; completionDate: Date | null } {
-  const { status, clearCompletionDate } = input
-
-  if (status === 'COMPLETED') {
-    const date = input.completionDate ? new Date(input.completionDate) : startOfToday()
-    return { status, completionDate: date }
-  }
-
-  if (clearCompletionDate) return { status, completionDate: null }
-  return { status, completionDate: input.completionDate ? new Date(input.completionDate) : null }
-}
+export const ADDRESS_ACTIONS: readonly AddressAction[] = ['OFF_HOLD', 'ON_HOLD']
 
 /**
  * Cross-field rules for a WHOLE address request, checked after a partial edit
@@ -45,14 +22,13 @@ export function resolveCompletion(input: {
  *
  * addressRequestSchema carries the same rules for full-record writes; a
  * single-cell PATCH cannot use it because the payload only holds one side of
- * each comparison. Both paths sit in front of the same DB CHECK constraints,
- * which stay the backstop.
+ * each comparison. Both paths sit in front of the chk_address_identifier DB
+ * constraint, which stays the backstop.
  */
 export function validateAddressRecord(r: {
   requestDate: Date
   tinaUuid: string | null
   aapId: string | null
-  status: AddressRequestStatus
   completionDate: Date | null
 }): string | null {
   if (!r.tinaUuid?.trim() && !r.aapId?.trim()) {
@@ -64,27 +40,17 @@ export function validateAddressRecord(r: {
   if (r.requestDate.getTime() > Date.now() + 86_400_000) {
     return 'The request date cannot be in the future.'
   }
-  if (r.status === 'COMPLETED' && !r.completionDate) {
-    return 'A completed request needs a completion date.'
-  }
   if (r.completionDate && r.completionDate.getTime() < r.requestDate.getTime()) {
     return 'The completion date cannot precede the request date.'
   }
   return null
 }
 
-/** UTC midnight — matches the date-only storage convention (spec A8). */
-export function startOfToday(): Date {
-  const now = new Date()
-  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()))
-}
-
 export interface AddressFilters {
   search?: string
-  status?: string
+  action?: string
   from?: string
   to?: string
-  hideCompleted?: string
 }
 
 /**
@@ -98,31 +64,27 @@ export function buildAddressWhere(
     params instanceof URLSearchParams ? params.get(key) ?? undefined : params[key]
 
   const search = get('search')?.trim()
-  const status = get('status')?.trim()
+  const action = get('action')?.trim()
   const from = get('from')
   const to = get('to')
-  // Default-on: the tracker is a work queue, so completed rows are hidden
-  // unless explicitly asked for.
-  const hideCompleted = get('hideCompleted') !== '0'
 
-  const statuses = status
-    ? status.split(',').filter((s): s is AddressRequestStatus =>
-        (['NOT_STARTED', 'ON_HOLD', 'BLOCKED', 'COMPLETED'] as string[]).includes(s))
+  // There is no longer a terminal state, so nothing is hidden by default — the
+  // old default-on "hide completed" filter went away with COMPLETED.
+  const actions = action
+    ? action.split(',').filter((a): a is AddressAction =>
+        (ADDRESS_ACTIONS as readonly string[]).includes(a))
     : []
 
   return {
     ...(search && {
       OR: [
         { reporter: { contains: search, mode: 'insensitive' as const } },
+        { popName: { contains: search, mode: 'insensitive' as const } },
         { tinaUuid: { contains: search, mode: 'insensitive' as const } },
         { aapId: { contains: search, mode: 'insensitive' as const } },
       ],
     }),
-    ...(statuses.length > 0
-      ? { status: { in: statuses } }
-      : hideCompleted
-        ? { status: { in: [...OPEN_STATUSES] } }
-        : {}),
+    ...(actions.length > 0 && { action: { in: actions } }),
     ...((from || to) && {
       requestDate: {
         ...(from && { gte: new Date(from + 'T00:00:00.000Z') }),
@@ -133,7 +95,7 @@ export function buildAddressWhere(
 }
 
 export type AddressSortKey =
-  | 'requestDate' | 'reporter' | 'status' | 'completionDate'
+  | 'requestDate' | 'reporter' | 'popName' | 'action' | 'completionDate'
 
 export function buildAddressOrderBy(
   sort?: string,
@@ -142,17 +104,20 @@ export function buildAddressOrderBy(
   const d: Prisma.SortOrder = dir === 'desc' ? 'desc' : 'asc'
 
   switch (sort) {
+    // reporter and popName are both optional now, so blanks sort to the bottom
+    // rather than forming a block at the top of an ascending sort.
     case 'reporter':
-      return [{ reporter: d }]
-    case 'status':
-      return [{ status: d }, { requestDate: 'desc' }]
+      return [{ reporter: { sort: d, nulls: 'last' } }]
+    case 'popName':
+      return [{ popName: { sort: d, nulls: 'last' } }]
+    case 'action':
+      return [{ action: d }, { requestDate: 'desc' }]
     case 'completionDate':
       return [{ completionDate: { sort: d, nulls: 'last' } }]
     case 'requestDate':
       return [{ requestDate: d }]
     default:
-      // Open work first, then oldest-requested first within each status —
-      // ageing items rise to the top, which is the point of the tracker.
-      return [{ status: 'asc' }, { requestDate: 'desc' }]
+      // Grouped by action, newest request first within each group.
+      return [{ action: 'asc' }, { requestDate: 'desc' }]
   }
 }

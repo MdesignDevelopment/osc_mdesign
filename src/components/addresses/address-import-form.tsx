@@ -67,7 +67,8 @@ export function AddressImportForm() {
             <p className="text-xs text-slate-400 mt-0.5">
               Rows are matched on Tina UUID or AAP ID, so re-uploading updates existing
               requests instead of duplicating them. A blank cell leaves the stored value
-              unchanged. Every change is recorded in the history.
+              unchanged — only the identifiers and, for a new request, the request date
+              are required. Every change is recorded in the history.
             </p>
           </div>
           <a href="/api/addresses/bulk" className="jira-btn-secondary text-xs flex-shrink-0">

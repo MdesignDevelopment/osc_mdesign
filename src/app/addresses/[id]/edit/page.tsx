@@ -42,10 +42,11 @@ export default async function EditAddressPage({ params }: { params: { id: string
         updatedAt={record.updatedAt.toISOString()}
         defaults={{
           requestDate: isoDate(record.requestDate),
-          reporter: record.reporter,
+          reporter: record.reporter ?? '',
+          popName: record.popName ?? '',
           tinaUuid: record.tinaUuid ?? '',
           aapId: record.aapId ?? '',
-          status: record.status,
+          action: record.action,
           notes: record.notes ?? '',
           completionDate: isoDate(record.completionDate),
         }}

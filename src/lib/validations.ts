@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { Role, AddressRequestStatus, ScriptStatus, DesignStage } from '@prisma/client'
+import { Role, AddressAction, ScriptStatus, DesignStage } from '@prisma/client'
 
 export const loginSchema = z.object({
   email: z.string().email('Invalid email address').transform(v => v.toLowerCase().trim()),
@@ -141,11 +141,12 @@ export const deleteWithReasonSchema = z.object({
 
 export const addressRequestSchema = z.object({
   requestDate: z.string().min(1, 'Request date is required'),
-  reporter: z.string().min(2, 'Reporter must be at least 2 characters').max(128),
+  reporter: z.string().max(128).optional().nullable(),
   reportedById: z.string().optional().nullable(),
+  popName: z.string().max(128).optional().nullable(),
   tinaUuid: z.string().max(64).optional().nullable(),
   aapId: z.string().max(64).optional().nullable(),
-  status: z.nativeEnum(AddressRequestStatus),
+  action: z.nativeEnum(AddressAction),
   notes: z.string().max(5000).optional().nullable(),
   completionDate: z.string().optional().nullable(),
   expectedUpdatedAt: z.string().optional(),
@@ -156,12 +157,6 @@ export const addressRequestSchema = z.object({
     message: 'Either a Tina UUID or an AAP ID is required',
     path: ['tinaUuid'],
   })
-  // Completion invariant (spec §7.4). The route defaults a missing completion
-  // date to today, so this only fires when the client sends an explicit null.
-  .refine(d => d.status !== 'COMPLETED' || d.completionDate !== null, {
-    message: 'A completed request needs a completion date',
-    path: ['completionDate'],
-  })
   .refine(
     d => !d.completionDate || new Date(d.completionDate) >= new Date(d.requestDate),
     { message: 'Completion date cannot precede the request date', path: ['completionDate'] },
@@ -171,10 +166,9 @@ export const addressRequestSchema = z.object({
     { message: 'Request date cannot be in the future', path: ['requestDate'] },
   )
 
-export const addressStatusPatchSchema = z.object({
-  status: z.nativeEnum(AddressRequestStatus),
+export const addressActionPatchSchema = z.object({
+  action: z.nativeEnum(AddressAction),
   completionDate: z.string().optional().nullable(),
-  clearCompletionDate: z.boolean().optional(),
   expectedUpdatedAt: z.string().optional(),
 })
 
@@ -182,24 +176,24 @@ export const addressStatusPatchSchema = z.object({
  * Single-cell edits from the grid view.
  *
  * Every field is optional because one cell moves at a time. The cross-field
- * rules addressRequestSchema enforces (at-least-one identifier, the completion
- * invariant, date ordering) cannot be checked here — a partial payload does not
- * carry the other side of the comparison — so the route merges onto the stored
- * record first and validates that with `validateAddressRecord`.
+ * rules addressRequestSchema enforces (at-least-one identifier, date ordering)
+ * cannot be checked here — a partial payload does not carry the other side of
+ * each comparison — so the route merges onto the stored record first and
+ * validates that with `validateAddressRecord`.
  */
 export const addressPatchSchema = z.object({
   requestDate: z.string().min(1).optional(),
-  reporter: z.string().min(2, 'Reporter must be at least 2 characters').max(128).optional(),
+  reporter: z.string().max(128).optional().nullable(),
   reportedById: z.string().optional().nullable(),
+  popName: z.string().max(128).optional().nullable(),
   tinaUuid: z.string().max(64).optional().nullable(),
   aapId: z.string().max(64).optional().nullable(),
-  status: z.nativeEnum(AddressRequestStatus).optional(),
+  action: z.nativeEnum(AddressAction).optional(),
   notes: z.string().max(5000).optional().nullable(),
   completionDate: z.string().optional().nullable(),
-  clearCompletionDate: z.boolean().optional(),
   expectedUpdatedAt: z.string().optional(),
 }).refine(
-  d => ['requestDate', 'reporter', 'reportedById', 'tinaUuid', 'aapId', 'status', 'notes', 'completionDate']
+  d => ['requestDate', 'reporter', 'reportedById', 'popName', 'tinaUuid', 'aapId', 'action', 'notes', 'completionDate']
     .some(k => d[k as keyof typeof d] !== undefined),
   { message: 'At least one field must be provided' },
 )
@@ -234,6 +228,6 @@ export type DesignSessionUpdateInput = z.infer<typeof designSessionUpdateSchema>
 export type DesignSessionFlagsInput = z.infer<typeof designSessionFlagsSchema>
 export type DesignSessionPatchInput = z.infer<typeof designSessionPatchSchema>
 export type AddressRequestInput = z.infer<typeof addressRequestSchema>
-export type AddressStatusPatchInput = z.infer<typeof addressStatusPatchSchema>
+export type AddressActionPatchInput = z.infer<typeof addressActionPatchSchema>
 export type AddressPatchInput = z.infer<typeof addressPatchSchema>
 export type ScriptExecutionIngestInput = z.infer<typeof scriptExecutionIngestSchema>

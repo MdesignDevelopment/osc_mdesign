@@ -14,10 +14,9 @@ const PAGE_SIZE = 25
 interface PageProps {
   searchParams: {
     search?: string
-    status?: string
+    action?: string
     from?: string
     to?: string
-    hideCompleted?: string
     page?: string
     sort?: string
     dir?: string
@@ -36,7 +35,7 @@ export default async function AddressesPage({ searchParams }: PageProps) {
   const where = buildAddressWhere(searchParams)
   const orderBy = buildAddressOrderBy(searchParams.sort, searchParams.dir)
 
-  const [requests, total, openCount] = await Promise.all([
+  const [requests, total, onHoldCount] = await Promise.all([
     prisma.addressRequest.findMany({
       where,
       orderBy,
@@ -45,7 +44,7 @@ export default async function AddressesPage({ searchParams }: PageProps) {
       include: { createdBy: { select: { name: true } } },
     }),
     prisma.addressRequest.count({ where }),
-    prisma.addressRequest.count({ where: { status: { not: 'COMPLETED' } } }),
+    prisma.addressRequest.count({ where: { action: 'ON_HOLD' } }),
   ])
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
@@ -56,7 +55,7 @@ export default async function AddressesPage({ searchParams }: PageProps) {
         <div>
           <h1 className="text-xl font-semibold text-neutral-900">Addresses</h1>
           <p className="text-sm text-neutral-400 mt-0.5 tabular-nums">
-            {total.toLocaleString()} request{total !== 1 ? 's' : ''} shown · {openCount.toLocaleString()} open
+            {total.toLocaleString()} request{total !== 1 ? 's' : ''} shown · {onHoldCount.toLocaleString()} on hold
           </p>
         </div>
         {canWrite && (
@@ -80,9 +79,10 @@ export default async function AddressesPage({ searchParams }: PageProps) {
           id: r.id,
           requestDate: r.requestDate.toISOString(),
           reporter: r.reporter,
+          popName: r.popName,
           tinaUuid: r.tinaUuid,
           aapId: r.aapId,
-          status: r.status,
+          action: r.action,
           completionDate: r.completionDate?.toISOString() ?? null,
           updatedAt: r.updatedAt.toISOString(),
           createdByName: r.createdBy.name,

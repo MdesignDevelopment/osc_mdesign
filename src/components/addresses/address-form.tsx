@@ -4,10 +4,9 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { AddressRequestStatus } from '@prisma/client'
 import { Loader2 } from 'lucide-react'
 import { addressRequestSchema, type AddressRequestInput } from '@/lib/validations'
-import { ADDRESS_STATUS_LABELS, ADDRESS_STATUS_ORDER } from '@/lib/utils'
+import { ADDRESS_ACTION_LABELS, ADDRESS_ACTION_ORDER } from '@/lib/utils'
 
 interface Props {
   mode: 'create' | 'edit'
@@ -27,31 +26,20 @@ export function AddressForm({ mode, id, defaults, updatedAt }: Props) {
   const [submitting, setSubmitting] = useState(false)
 
   const {
-    register, handleSubmit, watch, setValue, formState: { errors },
+    register, handleSubmit, formState: { errors },
   } = useForm<AddressRequestInput>({
     resolver: zodResolver(addressRequestSchema),
     defaultValues: {
       requestDate: defaults?.requestDate ?? todayIso(),
       reporter: defaults?.reporter ?? '',
+      popName: defaults?.popName ?? '',
       tinaUuid: defaults?.tinaUuid ?? '',
       aapId: defaults?.aapId ?? '',
-      status: defaults?.status ?? 'NOT_STARTED',
+      action: defaults?.action ?? 'OFF_HOLD',
       notes: defaults?.notes ?? '',
       completionDate: defaults?.completionDate ?? '',
     },
   })
-
-  const status = watch('status')
-  const isCompleted = status === 'COMPLETED'
-
-  // §7.4: completing a request pre-fills today's date, editable. The user is
-  // never asked to remember that the date is now required.
-  function onStatusChange(next: AddressRequestStatus) {
-    setValue('status', next, { shouldValidate: true })
-    if (next === 'COMPLETED' && !watch('completionDate')) {
-      setValue('completionDate', todayIso(), { shouldValidate: true })
-    }
-  }
 
   async function onSubmit(values: AddressRequestInput) {
     setSubmitting(true)
@@ -65,6 +53,8 @@ export function AddressForm({ mode, id, defaults, updatedAt }: Props) {
         body: JSON.stringify({
           ...values,
           completionDate: values.completionDate || null,
+          reporter: values.reporter || null,
+          popName: values.popName || null,
           tinaUuid: values.tinaUuid || null,
           aapId: values.aapId || null,
           notes: values.notes || null,
@@ -97,8 +87,12 @@ export function AddressForm({ mode, id, defaults, updatedAt }: Props) {
           <input id="requestDate" type="date" {...register('requestDate')} className="jira-input w-full" />
         </Field>
 
-        <Field label="Reporter *" error={errors.reporter?.message} htmlFor="reporter">
+        <Field label="Reporter" error={errors.reporter?.message} htmlFor="reporter">
           <input id="reporter" type="text" {...register('reporter')} placeholder="Who reported it" className="jira-input w-full" />
+        </Field>
+
+        <Field label="POP Name" error={errors.popName?.message} htmlFor="popName">
+          <input id="popName" type="text" {...register('popName')} placeholder="e.g. MRO_CITY_01_POP_001" className="jira-input w-full font-mono text-xs" />
         </Field>
 
         <Field
@@ -114,31 +108,25 @@ export function AddressForm({ mode, id, defaults, updatedAt }: Props) {
           <input id="aapId" type="text" {...register('aapId')} className="jira-input w-full font-mono text-xs" />
         </Field>
 
-        <Field label="Status *" error={errors.status?.message} htmlFor="status">
-          <select
-            id="status"
-            value={status}
-            onChange={(e) => onStatusChange(e.target.value as AddressRequestStatus)}
-            className="jira-input w-full"
-          >
-            {ADDRESS_STATUS_ORDER.map((s) => (
-              <option key={s} value={s}>{ADDRESS_STATUS_LABELS[s]}</option>
+        <Field label="Action *" error={errors.action?.message} htmlFor="action">
+          <select id="action" {...register('action')} className="jira-input w-full">
+            {ADDRESS_ACTION_ORDER.map((a) => (
+              <option key={a} value={a}>{ADDRESS_ACTION_LABELS[a]}</option>
             ))}
           </select>
         </Field>
 
         <Field
-          label={isCompleted ? 'Date of Completion *' : 'Date of Completion'}
+          label="Date of Completion"
           error={errors.completionDate?.message}
           htmlFor="completionDate"
-          hint={isCompleted ? undefined : 'Set automatically when the status becomes Completed.'}
+          hint="Optional. Cannot precede the request date."
         >
           <input
             id="completionDate"
             type="date"
             {...register('completionDate')}
-            disabled={!isCompleted}
-            className="jira-input w-full disabled:opacity-50"
+            className="jira-input w-full"
           />
         </Field>
       </div>

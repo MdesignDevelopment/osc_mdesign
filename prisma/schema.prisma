@@ -15,11 +15,13 @@ enum Role {
   WM_SUPPORT_ENGINEER // Wyer/Merkator Support Engineer
 }
 
-enum AddressRequestStatus {
-  NOT_STARTED
+// Replaced the four-value AddressRequestStatus in migration
+// 20260805000001. The tracker is a hold list, not a lifecycle: there is no
+// "completed" state any more, so `completionDate` is now a plain optional date
+// with no invariant attached to it.
+enum AddressAction {
+  OFF_HOLD
   ON_HOLD
-  BLOCKED
-  COMPLETED
 }
 
 enum AuditEntity {
@@ -214,14 +216,15 @@ model AddressRequest {
   id String @id @default(cuid())
 
   requestDate  DateTime
-  reporter     String
+  reporter     String?
   reportedById String?
   reportedBy   User?    @relation("AddressReportedBy", fields: [reportedById], references: [id])
 
+  popName        String?
   tinaUuid       String?
   aapId          String?
-  status         AddressRequestStatus @default(NOT_STARTED)
-  notes          String?              @db.Text
+  action         AddressAction @default(OFF_HOLD)
+  notes          String?       @db.Text
   completionDate DateTime?
 
   createdById String
@@ -229,9 +232,10 @@ model AddressRequest {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  // CHECK constraints (at-least-one identifier, completion invariant) are added
-  // by migration SQL — Prisma cannot express them.
-  @@index([status, requestDate])
+  // The at-least-one-identifier CHECK constraint is added by migration SQL —
+  // Prisma cannot express it. The completion invariant was dropped in
+  // 20260805000001 along with the COMPLETED status.
+  @@index([action, requestDate])
   @@index([tinaUuid])
   @@index([aapId])
   @@index([requestDate])

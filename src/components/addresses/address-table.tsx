@@ -3,11 +3,11 @@
 import Link from 'next/link'
 import { useRouter, usePathname } from 'next/navigation'
 import { useCallback, useState, useTransition } from 'react'
-import { AddressRequestStatus } from '@prisma/client'
+import { AddressAction } from '@prisma/client'
 import { ArrowUpRight, AlertCircle } from 'lucide-react'
 import {
   formatDate,
-  ADDRESS_STATUS_LABELS, ADDRESS_STATUS_LOZENGE, ADDRESS_STATUS_ORDER,
+  ADDRESS_ACTION_LABELS, ADDRESS_ACTION_LOZENGE, ADDRESS_ACTION_ORDER,
 } from '@/lib/utils'
 import { Lozenge } from '@/components/ui/lozenge'
 import { SortableTh, LiveRegion } from '@/components/shared/table'
@@ -20,10 +20,11 @@ import {
 export interface AddressRow {
   id: string
   requestDate: string
-  reporter: string
+  reporter: string | null
+  popName: string | null
   tinaUuid: string | null
   aapId: string | null
-  status: AddressRequestStatus
+  action: AddressAction
   completionDate: string | null
   updatedAt: string
   createdByName: string
@@ -31,33 +32,34 @@ export interface AddressRow {
 
 type EditableField = {
   requestDate?: string
-  reporter?: string
+  reporter?: string | null
+  popName?: string | null
   tinaUuid?: string | null
   aapId?: string | null
-  status?: AddressRequestStatus
+  action?: AddressAction
   completionDate?: string | null
-  clearCompletionDate?: boolean
 }
 
 const FIELD_LABELS: Record<string, string> = {
   requestDate: 'Request date',
   reporter: 'Reporter',
+  popName: 'POP name',
   tinaUuid: 'Tina UUID',
   aapId: 'AAP ID',
-  status: 'Status',
+  action: 'Action',
   completionDate: 'Completion date',
 }
 
-const STATUS_OPTIONS: CellOption[] = ADDRESS_STATUS_ORDER.map((s) => ({
-  value: s,
-  label: ADDRESS_STATUS_LABELS[s],
+const ACTION_OPTIONS: CellOption[] = ADDRESS_ACTION_ORDER.map((a) => ({
+  value: a,
+  label: ADDRESS_ACTION_LABELS[a],
 }))
 
 const GRID = 'addresses'
 const COL = {
-  requestDate: 0, reporter: 1, tinaUuid: 2, aapId: 3, status: 4, completionDate: 5,
+  requestDate: 0, reporter: 1, popName: 2, tinaUuid: 3, aapId: 4, action: 5, completionDate: 6,
 } as const
-const COLUMN_COUNT = 7
+const COLUMN_COUNT = 8
 
 /** Date-only fields are stored at UTC midnight, so the ISO date part is exact. */
 function dateInput(iso: string | null): string {
@@ -68,12 +70,22 @@ function today(): string {
   return new Date().toISOString().slice(0, 10)
 }
 
+/**
+ * Screen-reader subject for a row. Reporter used to fill this role, but it is
+ * optional now, so identity falls back through the fields that actually name a
+ * request. Mirrors `addressLabel` on the server.
+ */
+function rowLabel(v: { tinaUuid: string | null; aapId: string | null; popName: string | null; reporter: string | null }): string {
+  return v.tinaUuid?.trim() || v.aapId?.trim() || v.popName?.trim() || v.reporter?.trim() || 'this request'
+}
+
 interface DraftState {
   requestDate: string
   reporter: string
+  popName: string
   tinaUuid: string
   aapId: string
-  status: AddressRequestStatus
+  action: AddressAction
   completionDate: string
 }
 
@@ -81,9 +93,10 @@ function emptyDraft(): DraftState {
   return {
     requestDate: today(),
     reporter: '',
+    popName: '',
     tinaUuid: '',
     aapId: '',
-    status: 'NOT_STARTED',
+    action: 'OFF_HOLD',
     completionDate: '',
   }
 }
@@ -118,7 +131,7 @@ export function AddressTable({
   const [draftError, setDraftError] = useState<string | null>(null)
   const [draftSaving, setDraftSaving] = useState(false)
 
-  const currentSort = sort ?? 'status'
+  const currentSort = sort ?? 'action'
   const currentDir = dir ?? 'asc'
 
   const buildHref = useCallback(
@@ -140,17 +153,17 @@ export function AddressTable({
     const o = overrides[row.id] ?? {}
     return {
       requestDate: o.requestDate ?? row.requestDate,
-      reporter: o.reporter ?? row.reporter,
+      reporter: o.reporter !== undefined ? o.reporter : row.reporter,
+      popName: o.popName !== undefined ? o.popName : row.popName,
       tinaUuid: o.tinaUuid !== undefined ? o.tinaUuid : row.tinaUuid,
       aapId: o.aapId !== undefined ? o.aapId : row.aapId,
-      status: o.status ?? row.status,
+      action: o.action ?? row.action,
       completionDate: o.completionDate !== undefined ? o.completionDate : row.completionDate,
     }
   }
 
   async function patch(row: AddressRow, changes: EditableField) {
-    const { clearCompletionDate, ...optimistic } = changes
-    if (clearCompletionDate) optimistic.completionDate = null
+    const optimistic = { ...changes }
 
     setOverrides((p) => ({ ...p, [row.id]: { ...p[row.id], ...optimistic } }))
     setSaving((s) => ({ ...s, [row.id]: true }))
@@ -183,19 +196,9 @@ export function AddressTable({
 
       const saved = await res.json()
       if (saved?.updatedAt) setVersions((v) => ({ ...v, [row.id]: saved.updatedAt }))
-      // The server may have dated a COMPLETED request itself (§7.4).
-      if (saved?.completionDate !== undefined) {
-        setOverrides((p) => ({
-          ...p,
-          [row.id]: { ...p[row.id], completionDate: saved.completionDate ?? null },
-        }))
-      }
 
-      const fields = Object.keys(changes)
-        .filter((k) => k !== 'clearCompletionDate')
-        .map((k) => FIELD_LABELS[k] ?? k)
-        .join(', ')
-      setAnnouncement(`${fields} saved for ${row.reporter}.`)
+      const fields = Object.keys(changes).map((k) => FIELD_LABELS[k] ?? k).join(', ')
+      setAnnouncement(`${fields} saved for ${rowLabel(valuesOf(row))}.`)
 
       startTransition(() => router.refresh())
     } catch {
@@ -204,23 +207,6 @@ export function AddressTable({
     } finally {
       setSaving((s) => ({ ...s, [row.id]: false }))
     }
-  }
-
-  function changeStatus(row: AddressRow, status: AddressRequestStatus) {
-    const current = valuesOf(row)
-    if (status === current.status) return
-
-    // §7.4: moving away from COMPLETED clears the completion date. There is no
-    // form here to prompt from, so the list states the consequence up front.
-    let clearCompletionDate = false
-    if (current.status === 'COMPLETED' && status !== 'COMPLETED' && current.completionDate) {
-      clearCompletionDate = window.confirm(
-        'This request is completed. Change the status and clear its completion date?',
-      )
-      if (!clearCompletionDate) return
-    }
-
-    void patch(row, { status, ...(clearCompletionDate && { clearCompletionDate }) })
   }
 
   function openDraft() {
@@ -241,9 +227,7 @@ export function AddressTable({
     // than bouncing off the server for the obvious ones.
     const problem =
       !draft.requestDate ? 'A request date is required.'
-      : draft.reporter.trim().length < 2 ? 'A reporter is required.'
       : !draft.tinaUuid.trim() && !draft.aapId.trim() ? 'Enter either a Tina UUID or an AAP ID.'
-      : draft.status === 'COMPLETED' && !draft.completionDate ? 'A completed request needs a completion date.'
       : draft.completionDate && draft.completionDate < draft.requestDate
         ? 'The completion date cannot precede the request date.'
         : null
@@ -262,10 +246,11 @@ export function AddressTable({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           requestDate: draft.requestDate,
-          reporter: draft.reporter.trim(),
+          reporter: draft.reporter.trim() || null,
+          popName: draft.popName.trim() || null,
           tinaUuid: draft.tinaUuid.trim() || null,
           aapId: draft.aapId.trim() || null,
-          status: draft.status,
+          action: draft.action,
           completionDate: draft.completionDate || null,
         }),
       })
@@ -279,10 +264,12 @@ export function AddressTable({
         return
       }
 
+      const created = draft.tinaUuid.trim() || draft.aapId.trim()
+
       // Kept open and empty — the row exists so several requests can be logged
       // one after another without a form round-trip each time.
       setDraft(emptyDraft())
-      setAnnouncement(`Address request for ${draft.reporter.trim()} created.`)
+      setAnnouncement(`Address request ${created} created.`)
       requestAnimationFrame(() => focusRowStart(GRID, DRAFT_ROW))
       startTransition(() => router.refresh())
     } catch {
@@ -312,9 +299,10 @@ export function AddressTable({
               <tr>
                 <SortableTh label="Request Date" sortKey="requestDate" currentSort={currentSort} currentDir={currentDir} onSort={handleSort} />
                 <SortableTh label="Reporter" sortKey="reporter" currentSort={currentSort} currentDir={currentDir} onSort={handleSort} />
+                <SortableTh label="POP Name" sortKey="popName" currentSort={currentSort} currentDir={currentDir} onSort={handleSort} />
                 <PlainTh label="Tina UUID" />
                 <PlainTh label="AAP ID" />
-                <SortableTh label="Status" sortKey="status" currentSort={currentSort} currentDir={currentDir} onSort={handleSort} />
+                <SortableTh label="Action" sortKey="action" currentSort={currentSort} currentDir={currentDir} onSort={handleSort} />
                 <SortableTh label="Completed" sortKey="completionDate" currentSort={currentSort} currentDir={currentDir} onSort={handleSort} />
                 <PlainTh label="Open" srOnly className="w-10" />
               </tr>
@@ -348,6 +336,19 @@ export function AddressTable({
                     />
                     <DraftCell
                       gridId={GRID}
+                      col={COL.popName}
+                      value={draft.popName}
+                      ariaLabel="New request POP name"
+                      placeholder="POP name"
+                      maxLength={128}
+                      disabled={draftSaving}
+                      onChange={(v) => setDraft({ ...draft, popName: v })}
+                      onSave={saveDraft}
+                      onCancel={closeDraft}
+                      className="font-mono"
+                    />
+                    <DraftCell
+                      gridId={GRID}
                       col={COL.tinaUuid}
                       value={draft.tinaUuid}
                       ariaLabel="New request Tina UUID"
@@ -374,13 +375,13 @@ export function AddressTable({
                     />
                     <DraftCell
                       gridId={GRID}
-                      col={COL.status}
+                      col={COL.action}
                       kind="select"
-                      options={STATUS_OPTIONS}
-                      value={draft.status}
-                      ariaLabel="New request status"
+                      options={ACTION_OPTIONS}
+                      value={draft.action}
+                      ariaLabel="New request action"
                       disabled={draftSaving}
-                      onChange={(v) => setDraft({ ...draft, status: v as AddressRequestStatus })}
+                      onChange={(v) => setDraft({ ...draft, action: v as AddressAction })}
                       onSave={saveDraft}
                       onCancel={closeDraft}
                     />
@@ -424,6 +425,7 @@ export function AddressTable({
               {requests.map((row, rowIndex) => {
                 const values = valuesOf(row)
                 const busy = saving[row.id]
+                const label = rowLabel(values)
 
                 return (
                   <tr key={row.id} className="jira-table-row">
@@ -435,7 +437,7 @@ export function AddressTable({
                       value={dateInput(values.requestDate)}
                       editable={canWrite}
                       saving={busy}
-                      ariaLabel={`Request date — ${values.reporter}`}
+                      ariaLabel={`Request date — ${label}`}
                       display={formatDate(values.requestDate)}
                       className="tabular-nums whitespace-nowrap"
                       onCommit={(v) => patch(row, { requestDate: v })}
@@ -445,13 +447,26 @@ export function AddressTable({
                       gridId={GRID}
                       row={rowIndex}
                       col={COL.reporter}
-                      value={values.reporter}
+                      value={values.reporter ?? ''}
                       editable={canWrite}
                       maxLength={128}
                       saving={busy}
-                      ariaLabel={`Reporter — ${values.reporter}`}
-                      display={<span className="font-medium">{values.reporter}</span>}
-                      onCommit={(v) => patch(row, { reporter: v })}
+                      ariaLabel={`Reporter — ${label}`}
+                      display={values.reporter ? <span className="font-medium">{values.reporter}</span> : undefined}
+                      onCommit={(v) => patch(row, { reporter: v || null })}
+                    />
+
+                    <EditableCell
+                      gridId={GRID}
+                      row={rowIndex}
+                      col={COL.popName}
+                      value={values.popName ?? ''}
+                      editable={canWrite}
+                      maxLength={128}
+                      saving={busy}
+                      ariaLabel={`POP name — ${label}`}
+                      className="font-mono text-xs text-neutral-600"
+                      onCommit={(v) => patch(row, { popName: v || null })}
                     />
 
                     {/* Two columns rather than one merged identifier cell: the
@@ -465,7 +480,7 @@ export function AddressTable({
                       editable={canWrite}
                       maxLength={64}
                       saving={busy}
-                      ariaLabel={`Tina UUID — ${values.reporter}`}
+                      ariaLabel={`Tina UUID — ${label}`}
                       className="font-mono text-xs text-neutral-600"
                       onCommit={(v) => patch(row, { tinaUuid: v || null })}
                     />
@@ -478,7 +493,7 @@ export function AddressTable({
                       editable={canWrite}
                       maxLength={64}
                       saving={busy}
-                      ariaLabel={`AAP ID — ${values.reporter}`}
+                      ariaLabel={`AAP ID — ${label}`}
                       className="font-mono text-xs text-neutral-600"
                       onCommit={(v) => patch(row, { aapId: v || null })}
                     />
@@ -486,19 +501,19 @@ export function AddressTable({
                     <EditableCell
                       gridId={GRID}
                       row={rowIndex}
-                      col={COL.status}
+                      col={COL.action}
                       kind="select"
-                      options={STATUS_OPTIONS}
-                      value={values.status}
+                      options={ACTION_OPTIONS}
+                      value={values.action}
                       editable={canWrite}
                       saving={busy}
-                      ariaLabel={`Status — ${values.reporter}`}
+                      ariaLabel={`Action — ${label}`}
                       display={
-                        <Lozenge color={ADDRESS_STATUS_LOZENGE[values.status]}>
-                          {ADDRESS_STATUS_LABELS[values.status]}
+                        <Lozenge color={ADDRESS_ACTION_LOZENGE[values.action]}>
+                          {ADDRESS_ACTION_LABELS[values.action]}
                         </Lozenge>
                       }
-                      onCommit={(v) => changeStatus(row, v as AddressRequestStatus)}
+                      onCommit={(v) => patch(row, { action: v as AddressAction })}
                     />
 
                     <EditableCell
@@ -509,7 +524,7 @@ export function AddressTable({
                       value={dateInput(values.completionDate)}
                       editable={canWrite}
                       saving={busy}
-                      ariaLabel={`Completion date — ${values.reporter}`}
+                      ariaLabel={`Completion date — ${label}`}
                       display={values.completionDate ? formatDate(values.completionDate) : undefined}
                       className="tabular-nums whitespace-nowrap text-neutral-500"
                       onCommit={(v) => patch(row, { completionDate: v || null })}
@@ -518,7 +533,7 @@ export function AddressTable({
                     <td className="jira-table-cell">
                       <Link
                         href={`/addresses/${row.id}`}
-                        aria-label={`Open request from ${values.reporter}`}
+                        aria-label={`Open request ${label}`}
                         title="Open request"
                         className="inline-flex p-1 rounded text-neutral-300 hover:text-blue-600 hover:bg-blue-50 transition-colors"
                       >

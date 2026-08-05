@@ -1,6 +1,6 @@
 import { type ClassValue, clsx } from 'clsx'
 import { twMerge } from 'tailwind-merge'
-import { OscStatus, Priority, Role, AddressRequestStatus, ScriptStatus, DesignStage } from '@prisma/client'
+import { OscStatus, Priority, Role, AddressAction, ScriptStatus, DesignStage } from '@prisma/client'
 import { format } from 'date-fns'
 
 export function cn(...inputs: ClassValue[]) {
@@ -81,24 +81,44 @@ export const ROLE_LOZENGE: Record<Role, string> = {
   WM_SUPPORT_ENGINEER: 'bg-teal-600 text-white',
 }
 
-export const ADDRESS_STATUS_LABELS: Record<AddressRequestStatus, string> = {
+export const ADDRESS_ACTION_LABELS: Record<AddressAction, string> = {
+  OFF_HOLD: 'Off Hold',
+  ON_HOLD: 'On Hold',
+}
+
+export const ADDRESS_ACTION_LOZENGE: Record<AddressAction, string> = {
+  OFF_HOLD: 'bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200',
+  ON_HOLD: 'bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-200',
+}
+
+export const ADDRESS_ACTION_ORDER: readonly AddressAction[] = ['OFF_HOLD', 'ON_HOLD']
+
+/**
+ * Labels for values recorded before the Status → Action rename (migration
+ * 20260805000001). Those AuditLog rows still hold the old enum names, and the
+ * trail is never rewritten, so history needs its own lookup to stay readable.
+ */
+export const LEGACY_ADDRESS_STATUS_LABELS: Record<string, string> = {
   NOT_STARTED: 'Not Started',
   ON_HOLD: 'On Hold',
   BLOCKED: 'Blocked',
   COMPLETED: 'Completed',
 }
 
-export const ADDRESS_STATUS_LOZENGE: Record<AddressRequestStatus, string> = {
-  NOT_STARTED: 'bg-zinc-100 text-zinc-500',
-  ON_HOLD: 'bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-200',
-  BLOCKED: 'bg-red-50 text-red-600 ring-1 ring-inset ring-red-200',
-  COMPLETED: 'bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200',
+/**
+ * Render a stored audit value for an address request. Handles both the current
+ * `action` field and the legacy `status` rows behind it.
+ */
+export function formatAddressAuditValue(field: string | null, value: string): string {
+  if (field === 'action') {
+    return ADDRESS_ACTION_LABELS[value as AddressAction] ?? value
+  }
+  if (field === 'status') {
+    return LEGACY_ADDRESS_STATUS_LABELS[value] ?? value
+  }
+  if (field === 'requestDate' || field === 'completionDate') return formatDate(value)
+  return value
 }
-
-/** Lifecycle order for the UI — not the order the brief listed them in. */
-export const ADDRESS_STATUS_ORDER: readonly AddressRequestStatus[] = [
-  'NOT_STARTED', 'ON_HOLD', 'BLOCKED', 'COMPLETED',
-]
 
 export const SCRIPT_STATUS_LABELS: Record<ScriptStatus, string> = {
   SUCCESS: 'Success',

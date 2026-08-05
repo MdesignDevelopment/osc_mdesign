@@ -138,9 +138,10 @@ export const DESIGN_SESSION_FIELDS: readonly FieldSpec[] = [
 export const ADDRESS_REQUEST_FIELDS: readonly FieldSpec[] = [
   { key: 'requestDate', type: 'date' },
   { key: 'reporter', type: 'string' },
+  { key: 'popName', type: 'string' },
   { key: 'tinaUuid', type: 'string' },
   { key: 'aapId', type: 'string' },
-  { key: 'status', type: 'enum' },
+  { key: 'action', type: 'enum' },
   { key: 'notes', type: 'string' },
   { key: 'completionDate', type: 'date' },
 ]
@@ -164,9 +165,14 @@ export const DESIGN_SESSION_FIELD_LABELS: Record<string, string> = {
 export const ADDRESS_REQUEST_FIELD_LABELS: Record<string, string> = {
   requestDate: 'Request Date',
   reporter: 'Reporter',
+  popName: 'POP Name',
   tinaUuid: 'Tina UUID',
   aapId: 'AAP ID',
-  status: 'Status',
+  action: 'Action',
+  // Rows written before the Status → Action rename (migration 20260805000001)
+  // carry fieldChanged: 'status'. The trail is never rewritten, so the retired
+  // key keeps a label of its own rather than rendering as a raw column name.
+  status: 'Action (recorded as Status)',
   notes: 'Notes',
   completionDate: 'Date of Completion',
   deleteReason: 'Deletion Reason',

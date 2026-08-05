@@ -13,7 +13,7 @@
 
 import { can, landingRoute, capabilitiesFor } from '../src/lib/permissions'
 import { resolveFlags, buildDesignWhere } from '../src/lib/design-sessions'
-import { resolveCompletion, validateAddressRecord } from '../src/lib/addresses'
+import { validateAddressRecord, buildAddressWhere } from '../src/lib/addresses'
 import { diffFields, initialFields, DESIGN_SESSION_FIELDS, ADDRESS_REQUEST_FIELDS } from '../src/lib/audit'
 
 let pass = 0
@@ -138,29 +138,42 @@ check(
   {},
 )
 
-console.log('\n== Address completion invariant (§7.4) ==')
-const c1 = resolveCompletion({ status: 'COMPLETED', completionDate: null })
-check('COMPLETED auto-dates', c1.completionDate !== null, true)
-
-const c2 = resolveCompletion({ status: 'ON_HOLD', completionDate: '2026-01-01', clearCompletionDate: true })
-check('clearing works', c2.completionDate, null)
-
-const c3 = resolveCompletion({ status: 'BLOCKED', completionDate: '2026-01-01' })
-check('non-completed keeps date when not clearing', c3.completionDate?.toISOString().slice(0, 10), '2026-01-01')
-
-const c4 = resolveCompletion({ status: 'COMPLETED', completionDate: '2026-03-05' })
-check('explicit date preserved', c4.completionDate?.toISOString().slice(0, 10), '2026-03-05')
+// The Status → Action change (migration 20260805000001) removed COMPLETED, and
+// with it the completion invariant and `resolveCompletion`. What remains is
+// filtering, which no longer hides anything by default because there is no
+// terminal state left to hide.
+console.log('\n== Address action filtering ==')
+check('no action chosen matches everything', buildAddressWhere({}), {})
+check(
+  'a chosen action matches the column',
+  buildAddressWhere({ action: 'ON_HOLD' }),
+  { action: { in: ['ON_HOLD'] } },
+)
+check(
+  'both actions can be selected at once',
+  buildAddressWhere({ action: 'OFF_HOLD,ON_HOLD' }),
+  { action: { in: ['OFF_HOLD', 'ON_HOLD'] } },
+)
+check(
+  'an unknown action value is ignored rather than matching nothing',
+  buildAddressWhere({ action: 'COMPLETED' }),
+  {},
+)
+check(
+  'search covers popName alongside the identifiers',
+  (buildAddressWhere({ search: 'abc' }).OR as unknown[])?.length,
+  4,
+)
 
 // The grid PATCH endpoint edits one cell at a time, so addressRequestSchema's
 // cross-field rules cannot run on the payload — they run on the merged record
-// instead. These are the rules the DB CHECK constraints would otherwise be the
+// instead. These are the rules chk_address_identifier would otherwise be the
 // first to surface.
-console.log('\n== Address record validation after a single-cell edit (§7.1/§7.4) ==')
+console.log('\n== Address record validation after a single-cell edit (§7.1) ==')
 const baseAddress = {
   requestDate: new Date('2026-01-05T00:00:00Z'),
   tinaUuid: 'tina-1',
   aapId: null,
-  status: 'NOT_STARTED' as const,
   completionDate: null,
 }
 check('a valid record passes', validateAddressRecord(baseAddress), null)
@@ -180,15 +193,14 @@ check(
   true,
 )
 check(
-  'COMPLETED without a date is rejected',
-  validateAddressRecord({ ...baseAddress, status: 'COMPLETED' }) !== null,
-  true,
+  'no completion date is fine — completion is no longer a state',
+  validateAddressRecord({ ...baseAddress, completionDate: null }),
+  null,
 )
 check(
   'completion before request is rejected',
   validateAddressRecord({
     ...baseAddress,
-    status: 'COMPLETED',
     completionDate: new Date('2026-01-04T00:00:00Z'),
   }) !== null,
   true,
@@ -197,7 +209,6 @@ check(
   'completion on the request date is allowed',
   validateAddressRecord({
     ...baseAddress,
-    status: 'COMPLETED',
     completionDate: new Date('2026-01-05T00:00:00Z'),
   }),
   null,

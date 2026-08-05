@@ -2,10 +2,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { authorize } from '@/lib/api-auth'
 import * as XLSX from 'xlsx'
-import { Prisma, AddressRequestStatus } from '@prisma/client'
+import { Prisma, AddressAction } from '@prisma/client'
 import { auditRows, diffFields, initialFields, ADDRESS_REQUEST_FIELDS } from '@/lib/audit'
-import { addressLabel, resolveCompletion, validateAddressRecord } from '@/lib/addresses'
-import { ADDRESS_STATUS_LABELS, ADDRESS_STATUS_ORDER } from '@/lib/utils'
+import { addressLabel, validateAddressRecord } from '@/lib/addresses'
+import { ADDRESS_ACTION_LABELS, ADDRESS_ACTION_ORDER } from '@/lib/utils'
 
 // Bulk XLSX import for address requests, following /api/design-sessions/bulk.
 //
@@ -16,35 +16,35 @@ import { ADDRESS_STATUS_LABELS, ADDRESS_STATUS_ORDER } from '@/lib/utils'
 //      identifier and a row that matches more than one stored request is
 //      reported rather than resolved — picking one arbitrarily would silently
 //      overwrite the wrong record.
-//   2. A blank cell means "leave unchanged", not "clear". `requestDate` and
-//      `reporter` are NOT NULL, so blank-means-null is not even expressible for
-//      them; making the rule uniform across every column is more predictable
-//      than a per-column split. The consequence — notes cannot be cleared from
-//      a spreadsheet — is stated in the UI.
+//   2. A blank cell means "leave unchanged", not "clear". `requestDate` is NOT
+//      NULL, so blank-means-null is not even expressible for it; making the rule
+//      uniform across every column is more predictable than a per-column split.
+//      The consequence — notes cannot be cleared from a spreadsheet — is stated
+//      in the UI.
 //
 // Audit: a run that overwrites 300 rows is as auditable as 300 manual edits.
 // See SPEC-WYER-MERKATOR.md §10.3.
 
 const COLUMNS = [
-  'Request Date', 'Reporter', 'Tina UUID', 'AAP ID', 'Status', 'Notes', 'Date of Completion',
+  'Request Date', 'Reporter', 'POP Name', 'Tina UUID', 'AAP ID', 'Action', 'Notes', 'Date of Completion',
 ] as const
 
 const MAX_ROWS = 1000
 const MAX_BYTES = 5 * 1024 * 1024
 
-const STATUS_LABEL_LIST = ADDRESS_STATUS_ORDER.map((s) => ADDRESS_STATUS_LABELS[s]).join(', ')
+const ACTION_LABEL_LIST = ADDRESS_ACTION_ORDER.map((a) => ADDRESS_ACTION_LABELS[a]).join(', ')
 
-/** Loose on case, spaces and underscores, so 'not started' matches NOT_STARTED. */
-function statusKey(raw: string): string {
+/** Loose on case, spaces and underscores, so 'off hold' matches OFF_HOLD. */
+function actionKey(raw: string): string {
   return raw.trim().toUpperCase().replace(/[\s-]+/g, '_')
 }
 
 // The enum names are the normalised form of the display labels, so one map
-// keyed on statusKey() accepts both spellings.
-const STATUS_BY_KEY = new Map<string, AddressRequestStatus>(
-  ADDRESS_STATUS_ORDER.flatMap((s) => [
-    [s as string, s] as [string, AddressRequestStatus],
-    [statusKey(ADDRESS_STATUS_LABELS[s]), s] as [string, AddressRequestStatus],
+// keyed on actionKey() accepts both spellings.
+const ACTION_BY_KEY = new Map<string, AddressAction>(
+  ADDRESS_ACTION_ORDER.flatMap((a) => [
+    [a as string, a] as [string, AddressAction],
+    [actionKey(ADDRESS_ACTION_LABELS[a]), a] as [string, AddressAction],
   ]),
 )
 
@@ -93,7 +93,8 @@ interface RawRow {
   tinaUuid: string
   aapId: string
   reporter: string
-  statusRaw: string
+  popName: string
+  actionRaw: string
   notes: string
   requestDateCell: unknown
   completionDateCell: unknown
@@ -105,10 +106,11 @@ interface ResolvedRow {
   existingId: string | null
   next: {
     requestDate: Date
-    reporter: string
+    reporter: string | null
+    popName: string | null
     tinaUuid: string | null
     aapId: string | null
-    status: AddressRequestStatus
+    action: AddressAction
     notes: string | null
     completionDate: Date | null
   }
@@ -117,10 +119,11 @@ interface ResolvedRow {
 type ExistingRecord = {
   id: string
   requestDate: Date
-  reporter: string
+  reporter: string | null
+  popName: string | null
   tinaUuid: string | null
   aapId: string | null
-  status: AddressRequestStatus
+  action: AddressAction
   notes: string | null
   completionDate: Date | null
 }
@@ -135,13 +138,14 @@ export async function GET() {
   const ws = XLSX.utils.aoa_to_sheet([
     [...COLUMNS],
     [
-      '04/08/2026', 'Jan Peeters', '550e8400-e29b-41d4-a716-446655440000', '',
-      'Not Started', 'Example note', '',
+      '04/08/2026', 'Jan Peeters', 'MRO_CITY_01_POP_001',
+      '550e8400-e29b-41d4-a716-446655440000', '',
+      'Off Hold', 'Example note', '',
     ],
   ])
   ws['!cols'] = [
-    { wch: 14 }, { wch: 20 }, { wch: 38 }, { wch: 16 },
-    { wch: 14 }, { wch: 40 }, { wch: 18 },
+    { wch: 14 }, { wch: 20 }, { wch: 24 }, { wch: 38 }, { wch: 16 },
+    { wch: 12 }, { wch: 40 }, { wch: 18 },
   ]
   XLSX.utils.book_append_sheet(wb, ws, 'Addresses')
 
@@ -150,17 +154,19 @@ export async function GET() {
   const ref = XLSX.utils.aoa_to_sheet([
     ['Column', 'Accepted values'],
     ['Request Date', 'dd/MM/yyyy or yyyy-MM-dd — required for new requests'],
-    ['Reporter', '2 to 128 characters — required for new requests'],
+    ['Reporter', 'Optional, up to 128 characters'],
+    ['POP Name', 'Optional, up to 128 characters'],
     ['Tina UUID', 'Up to 64 characters'],
     ['AAP ID', 'Up to 64 characters'],
-    ['Status', STATUS_LABEL_LIST],
+    ['Action', ACTION_LABEL_LIST],
     ['Notes', 'Up to 5000 characters'],
-    ['Date of Completion', 'dd/MM/yyyy or yyyy-MM-dd — required when Status is Completed'],
+    ['Date of Completion', 'Optional, dd/MM/yyyy or yyyy-MM-dd — cannot precede the request date'],
     [],
     ['Every row needs a Tina UUID or an AAP ID — that is what existing requests are matched on.'],
     ['A blank cell leaves the stored value unchanged; it does not clear it.'],
+    ['A blank Action defaults to Off Hold on a new request, and is left alone on an existing one.'],
   ])
-  ref['!cols'] = [{ wch: 20 }, { wch: 70 }]
+  ref['!cols'] = [{ wch: 20 }, { wch: 74 }]
   XLSX.utils.book_append_sheet(wb, ref, 'Reference')
 
   const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' })
@@ -267,7 +273,8 @@ export async function POST(req: NextRequest) {
       tinaUuid,
       aapId,
       reporter: cell('Reporter'),
-      statusRaw: cell('Status'),
+      popName: cell('POP Name'),
+      actionRaw: cell('Action'),
       notes: cell('Notes'),
       requestDateCell: row['Request Date'],
       completionDateCell: row['Date of Completion'],
@@ -291,7 +298,8 @@ export async function POST(req: NextRequest) {
   )
 
   const existingRecords = await prisma.$queryRaw<ExistingRecord[]>(Prisma.sql`
-    SELECT id, "requestDate", reporter, "tinaUuid", "aapId", status, notes, "completionDate"
+    SELECT id, "requestDate", reporter, "popName", "tinaUuid", "aapId",
+           action, notes, "completionDate"
     FROM "AddressRequest"
     WHERE LOWER("tinaUuid") IN (${Prisma.join(identifiers)})
        OR LOWER("aapId") IN (${Prisma.join(identifiers)})
@@ -368,35 +376,31 @@ export async function POST(req: NextRequest) {
       continue
     }
 
-    let status: AddressRequestStatus
-    if (r.statusRaw) {
-      const parsedStatus = STATUS_BY_KEY.get(statusKey(r.statusRaw))
-      if (!parsedStatus) {
+    let action: AddressAction
+    if (r.actionRaw) {
+      const parsedAction = ACTION_BY_KEY.get(actionKey(r.actionRaw))
+      if (!parsedAction) {
         errors.push({
           row: r.rowNum,
-          message: `Status "${r.statusRaw}" is not one of: ${STATUS_LABEL_LIST}`,
-          field: 'Status',
+          message: `Action "${r.actionRaw}" is not one of: ${ACTION_LABEL_LIST}`,
+          field: 'Action',
         })
         continue
       }
-      status = parsedStatus
+      action = parsedAction
     } else {
-      status = existing?.status ?? 'NOT_STARTED'
+      action = existing?.action ?? 'OFF_HOLD'
     }
 
-    const reporter = r.reporter || existing?.reporter || ''
-    if (reporter.length < 2) {
-      errors.push({
-        row: r.rowNum,
-        message: r.reporter
-          ? 'Reporter must be at least 2 characters'
-          : 'Reporter is required for a new request',
-        field: 'Reporter',
-      })
+    const reporter = r.reporter || existing?.reporter || null
+    if (reporter && reporter.length > 128) {
+      errors.push({ row: r.rowNum, message: 'Reporter is longer than 128 characters', field: 'Reporter' })
       continue
     }
-    if (reporter.length > 128) {
-      errors.push({ row: r.rowNum, message: 'Reporter is longer than 128 characters', field: 'Reporter' })
+
+    const popName = r.popName || existing?.popName || null
+    if (popName && popName.length > 128) {
+      errors.push({ row: r.rowNum, message: 'POP Name is longer than 128 characters', field: 'POP Name' })
       continue
     }
 
@@ -406,25 +410,15 @@ export async function POST(req: NextRequest) {
       continue
     }
 
-    // §7.4, matching the PATCH route: re-opening a completed request drops the
-    // completion date unless this row supplied one.
-    const mergedStatus = status
-    const leavingCompleted = existing?.status === 'COMPLETED' && mergedStatus !== 'COMPLETED'
-
-    const resolvedCompletion = resolveCompletion({
-      status: mergedStatus,
-      completionDate: completionDate ?? existing?.completionDate ?? null,
-      clearCompletionDate: leavingCompleted && !completionDate,
-    })
-
     const next = {
       requestDate: requestDate ?? existing!.requestDate,
       reporter,
+      popName,
       tinaUuid: r.tinaUuid || existing?.tinaUuid || null,
       aapId: r.aapId || existing?.aapId || null,
-      status: resolvedCompletion.status,
+      action,
       notes,
-      completionDate: resolvedCompletion.completionDate,
+      completionDate: completionDate ?? existing?.completionDate ?? null,
     }
 
     const invalid = validateAddressRecord(next)

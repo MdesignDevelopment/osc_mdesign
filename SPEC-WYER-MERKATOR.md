@@ -118,11 +118,9 @@ enum Role {
   WM_SUPPORT_ENGINEER          // Wyer/Merkator Support Engineer
 }
 
-enum AddressRequestStatus {
-  NOT_STARTED
+enum AddressAction {          // was AddressRequestStatus until 20260805000001
+  OFF_HOLD
   ON_HOLD
-  BLOCKED
-  COMPLETED
 }
 
 enum AuditEntity {
@@ -144,7 +142,7 @@ enum ScriptStatus {
 }
 ```
 
-`AddressRequestStatus` is deliberately a **separate** enum from `OscStatus` even though both contain an "on hold" concept. They are different lifecycles on different entities; sharing the enum would couple two unrelated state machines and pollute `STATUS_LABELS`.
+`AddressAction` is deliberately a **separate** enum from `OscStatus` even though both contain an "on hold" concept. They are different state machines on different entities; sharing the enum would couple them and pollute `STATUS_LABELS`.
 
 ### 3.2 Module 1 — `DesignSession`
 
@@ -229,22 +227,23 @@ model AddressRequest {
   id String @id @default(cuid())
 
   requestDate    DateTime
-  reporter       String
+  reporter       String?                    // optional since 20260805000001
   reportedById   String?
   reportedBy     User?   @relation("AddressReportedBy", fields: [reportedById], references: [id])
 
+  popName        String?
   tinaUuid       String?                    // see assumption A2
   aapId          String?
-  status         AddressRequestStatus @default(NOT_STARTED)
+  action         AddressAction @default(OFF_HOLD)
   notes          String? @db.Text
-  completionDate DateTime?
+  completionDate DateTime?                  // no invariant — see §7.4
 
   createdById String
   createdBy   User     @relation("AddressCreatedBy", fields: [createdById], references: [id])
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  @@index([status, requestDate])
+  @@index([action, requestDate])
   @@index([tinaUuid])
   @@index([aapId])
   @@index([requestDate])
@@ -316,6 +315,8 @@ ALTER TABLE "AddressRequest"
   CHECK ("tinaUuid" IS NOT NULL OR "aapId" IS NOT NULL);
 
 -- 3. Enforce the completion invariant from §7.4.
+--    DROPPED by 20260805000001 together with the COMPLETED status. Kept here
+--    for the record; do not re-add it.
 ALTER TABLE "AddressRequest"
   ADD CONSTRAINT chk_address_completion
   CHECK (status <> 'COMPLETED' OR "completionDate" IS NOT NULL);
@@ -787,35 +788,40 @@ Use `unstable_noStore()` in the page, as the OSC detail page does — the OSC St
 
 | Field | Column | Type | Editable | Validation |
 |---|---|---|---|---|
+> **Revised 2026-08-05 (migration `20260805000001`).** The four-value `Status`
+> became a two-value `Action`, `reporter` became optional, and `popName` was
+> added. The tracker is a hold list, not a lifecycle. Everything below reflects
+> the current shape; §7.4 records what the change removed.
+
+| Field | Column | Type | Editable | Validation |
+|---|---|---|---|---|
 | Request Date | `requestDate` | Date | ✅ | Required, not more than 1 day in the future |
-| Reporter | `reporter` | Text | ✅ | Required, 2–128 chars |
+| Reporter | `reporter` | Text | ✅ | **Optional**, ≤128 chars |
+| POP Name | `popName` | Text | ✅ | Optional, ≤128 chars |
 | Tina_UUID | `tinaUuid` | Text | ✅ | Optional; UUID format if it parses as one, else free text ≤64 |
 | AAP_ID | `aapId` | Text | ✅ | Optional, ≤64 chars |
-| Status | `status` | Enum | ✅ | Required; `NOT_STARTED` \| `ON_HOLD` \| `BLOCKED` \| `COMPLETED` |
+| Action | `action` | Enum | ✅ | Required; `OFF_HOLD` \| `ON_HOLD` |
 | Notes | `notes` | Long text | ✅ | Optional, ≤5000 chars |
-| Date of Completion | `completionDate` | Date | ✅ (conditional) | Required iff `status = COMPLETED`; ≥ `requestDate` |
+| Date of Completion | `completionDate` | Date | ✅ | Optional; ≥ `requestDate` when set |
 
-Cross-field rule: **at least one of `tinaUuid` / `aapId` must be present** (assumption A2). Enforced in zod via `.refine()` *and* by the DB CHECK constraint in §3.5 — the constraint is the backstop for bulk imports and any future API path that bypasses the zod schema.
+Cross-field rule: **at least one of `tinaUuid` / `aapId` must be present** (assumption A2). Enforced in zod via `.refine()` *and* by the DB CHECK constraint in §3.5 — the constraint is the backstop for bulk imports and any future API path that bypasses the zod schema. It is also the key the bulk importer matches on (§10.3).
 
-### 7.2 Status vocabulary
-
-Displayed in the brief's order, which is *not* lifecycle order. Use lifecycle order in the UI (`Not Started → On Hold → Blocked → Completed`) and add to `utils.ts`:
+### 7.2 Action vocabulary
 
 ```ts
-export const ADDRESS_STATUS_LABELS: Record<AddressRequestStatus, string> = {
-  NOT_STARTED: 'Not Started',
-  ON_HOLD:     'On Hold',
-  BLOCKED:     'Blocked',
-  COMPLETED:   'Completed',
+export const ADDRESS_ACTION_LABELS: Record<AddressAction, string> = {
+  OFF_HOLD: 'Off Hold',
+  ON_HOLD:  'On Hold',
 }
 
-export const ADDRESS_STATUS_LOZENGE: Record<AddressRequestStatus, string> = {
-  NOT_STARTED: /* zinc   */, ON_HOLD: /* amber */,
-  BLOCKED:     /* red    */, COMPLETED: /* emerald */,
+export const ADDRESS_ACTION_LOZENGE: Record<AddressAction, string> = {
+  OFF_HOLD: /* emerald */, ON_HOLD: /* amber */,
 }
 ```
 
-Colours reuse the existing `STATUS_LOZENGE` vocabulary so `BLOCKED` reads with the same urgency as `CHECK_REMARKS`. Typing both as `Record<AddressRequestStatus, …>` means a future status is a compile error, consistent with §4.4's approach.
+Typing both as `Record<AddressAction, …>` means a future action is a compile error, consistent with §4.4's approach.
+
+Retired values (`NOT_STARTED`, `BLOCKED`, `COMPLETED`) survive only in `AuditLog` rows written before the rename, which also carry `fieldChanged: 'status'`. `LEGACY_ADDRESS_STATUS_LABELS` and the `status` entry in `ADDRESS_REQUEST_FIELD_LABELS` keep that history readable. **The audit trail is never rewritten to match a later schema** — doing so would defeat the point of having one.
 
 ### 7.3 List view
 
@@ -823,27 +829,30 @@ Columns: `Request Date · Reporter · Tina UUID / AAP ID · Status · Age · Com
 
 - **Tina UUID / AAP ID** render in one column as two stacked chips, labelled, so it is unambiguous which identifier is present. Whichever is null is omitted, not shown as `—`.
 - **Age** is derived: days between `requestDate` and (`completionDate` ?? today). Highlight amber >14 days, red >30 days, for non-completed rows only. This is the column that makes the tracker operationally useful — a flat list of dates does not surface ageing work.
-- Sortable: Request Date, Reporter, Status, Age, Completion Date. Default: `status` (open first), then `requestDate desc`.
-- Filters: free text (Reporter, Tina UUID, AAP ID), Status multi-select, request-date range, "Hide completed" toggle on by default.
-- Status is **inline-editable** via a select for `address:write`, same optimistic pattern as §6.3 — with the §7.4 completion-date interaction handled as described.
+- Sortable: Request Date, Reporter, POP Name, Action, Completion Date. Default: `action asc`, then `requestDate desc`.
+- Filters: free text (Reporter, POP Name, Tina UUID, AAP ID), Action multi-select, request-date range. **Nothing is hidden by default** — there is no terminal state left to hide.
+- Action is **inline-editable** via a select for `address:write`, same optimistic pattern as §6.3. Changing it has no side effects on any other field.
 - `PAGE_SIZE = 25`.
 
-### 7.4 Status ↔ completion date interaction
+### 7.4 Completion date (formerly: status ↔ completion date interaction)
 
-The only real business logic in this module:
+**Withdrawn 2026-08-05.** This section described the module's only real business logic: `COMPLETED` auto-dating to today, the prompt to clear the date when leaving `COMPLETED`, and the `chk_address_completion` CHECK constraint backing it.
 
-- Setting `status = COMPLETED` with no `completionDate` → default it to **today**, pre-filled and editable in the form. From the *inline* list editor there is no form, so set it to today automatically and write both audit rows.
-- Setting `status = COMPLETED` with a `completionDate` earlier than `requestDate` → validation error.
-- Changing `status` *away* from `COMPLETED` → prompt: *"Clear the completion date?"* Default **yes**. Clearing writes its own audit row. Leaving a completion date on a non-completed record is exactly the kind of quiet inconsistency that erodes trust in a tracker.
-- `completionDate` is editable while `status = COMPLETED` (back-dating a completion is legitimate).
-- The DB CHECK constraint (§3.5) guarantees the invariant even if a future code path forgets.
+`COMPLETED` no longer exists, so none of it has a trigger. What replaced it:
+
+- `completionDate` is an **ordinary optional date**. Nothing auto-fills it, nothing clears it, and no action depends on it.
+- The one rule left: it cannot precede `requestDate`. Enforced in `addressRequestSchema` for full writes and in `validateAddressRecord` for merged single-cell edits.
+- `chk_address_completion` was **dropped**. `chk_address_identifier` (A2) stays.
+- `resolveCompletion()` was deleted, along with the `clearCompletionDate` flag on both patch schemas — clearing is now just `completionDate: null`.
+
+Stored completion dates were **preserved** by the migration; only the rules around them went away.
 
 ### 7.5 Detail view layout
 
 Same two-column shell as §6.7, simplified — no scripts panel:
 
 - **Left:** H1 (`Tina UUID` ?? `AAP ID`, whichever is present), `[Edit]` / `[Delete*]`, Notes panel, History panel (`AuditTimeline`).
-- **Right:** Status, Age, Request Date, Completion Date, Reporter, Tina UUID, AAP ID, Created By/At, Last Updated.
+- **Right:** Action, Request Date, Completion Date, Reporter, POP Name, Tina UUID, AAP ID, Created By/At, Last Updated.
 
 ---
 
@@ -864,9 +873,12 @@ All routes: `401` unauthenticated, `403` on capability failure, `400` on zod fai
 | `GET` | `/api/addresses` | `address:read` | List; filters per §7.3 |
 | `POST` | `/api/addresses` | `address:write` | Create |
 | `GET` | `/api/addresses/[id]` | `address:read` | Detail + audit |
-| `PUT` | `/api/addresses/[id]` | `address:write` | Full update. Applies §7.4 rules. `updatedAt` precondition |
-| `PATCH` | `/api/addresses/[id]/status` | `address:write` | Inline status change. Applies §7.4 |
+| `PUT` | `/api/addresses/[id]` | `address:write` | Full update. `updatedAt` precondition |
+| `PATCH` | `/api/addresses/[id]` | `address:write` | Single-cell grid edit. Merges onto the stored record, then `validateAddressRecord` |
+| `PATCH` | `/api/addresses/[id]/action` | `address:write` | Inline action change. Was `/status` until `20260805000001` |
 | `DELETE` | `/api/addresses/[id]` | `address:delete` | Requires `{ reason }` |
+| `POST` | `/api/addresses/bulk` | `address:write` | XLSX import, upsert on Tina UUID / AAP ID (§10.3) |
+| `GET` | `/api/addresses/bulk` | `address:write` | Blank XLSX template |
 | `GET` | `/api/audit` | `audit:read:*` | Paged audit feed. `entity` param **validated against capability** (§5.4) |
 | `POST` | `/api/v1/script-executions` | API key | Ingest (§6.5). Rate-limited. Idempotent on `externalRef` |
 
@@ -922,7 +934,9 @@ This matters most for the inline toggles (§6.3) and inline status edits (§7.4)
 
   A hard regex would have rejected all 21. `isUnusualPopZone` now accepts both families (0 false positives across 433) while still flagging genuinely malformed input such as `CABINET_123` or `MRO_GENK_1_POP_1`.
 
-### 10.3 Bulk import (Design Sessions)
+### 10.3 Bulk import
+
+#### Design Sessions
 
 Mirror [bulk-upload-form.tsx](src/components/osc/bulk-upload-form.tsx) and `/api/osc/bulk`, with the lesson of commit `4e9f4df` applied from the start:
 
@@ -932,7 +946,16 @@ Mirror [bulk-upload-form.tsx](src/components/osc/bulk-upload-form.tsx) and `/api
 - Audit: one `CREATE` row per new record; a normal field-level diff for each updated record. A bulk import that overwrites 300 records must be as auditable as 300 manual edits — this is the audit trail's hardest requirement and the easiest to get wrong.
 - Attribute all rows to the importing user with a single timestamp per import batch.
 
-Dependency note: `xlsx@0.18.5` is declared in **devDependencies** ([package.json:65](package.json#L65)) but imported by runtime code ([route.ts](src/app/api/osc/bulk/route.ts)). It works today because Next.js bundles it at build time, but any production install using `--omit=dev` will fail the build. Module 1's importer inherits this. Move it to `dependencies` during Phase 3.
+#### Addresses
+
+Same shape ([route.ts](src/app/api/addresses/bulk/route.ts), [address-import-form.tsx](src/components/addresses/address-import-form.tsx)), with two differences forced by this table:
+
+- **There is no unique key to upsert on.** `tinaUuid` and `aapId` are nullable and non-unique, so a row is matched against *either* identifier, case-insensitively via raw `LOWER()` (Prisma's `in` is case-sensitive on PostgreSQL). A row matching **more than one** stored request is reported as a row error listing the matches — picking one arbitrarily would silently overwrite the wrong record. Resolving that needs a human, or a unique index.
+- **A blank cell means "leave unchanged", not "clear".** `requestDate` is `NOT NULL`, so blank-means-null is not expressible for it, and a per-column split would be unpredictable. Only the identifiers are mandatory on every row; `requestDate` is required only when creating. The consequence — notes cannot be cleared from a spreadsheet — is stated in the UI and on the template's Reference sheet.
+
+A missing or renamed header fails the whole upload with one message rather than producing the same row error 1000 times. `xlsx@0.18` cannot write real dropdown validation, so accepted values ship as a second `Reference` sheet.
+
+Dependency note: `xlsx@0.18.5` is declared in **devDependencies** ([package.json:65](package.json#L65)) but imported by runtime code ([route.ts](src/app/api/osc/bulk/route.ts)). It works today because Next.js bundles it at build time, but any production install using `--omit=dev` will fail the build. Both new importers inherit this. Move it to `dependencies` during Phase 3.
 
 ### 10.4 Performance
 

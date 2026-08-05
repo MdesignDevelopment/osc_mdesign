@@ -3,7 +3,7 @@ import { prisma } from '@/lib/db'
 import { authorize, validationError, notFound, conflict } from '@/lib/api-auth'
 import { addressRequestSchema, addressPatchSchema, deleteWithReasonSchema } from '@/lib/validations'
 import { auditRows, diffFields, ADDRESS_REQUEST_FIELDS } from '@/lib/audit'
-import { addressLabel, resolveCompletion, validateAddressRecord } from '@/lib/addresses'
+import { addressLabel, validateAddressRecord } from '@/lib/addresses'
 
 export async function GET(_: NextRequest, { params }: { params: { id: string } }) {
   const auth = await authorize('address:read')
@@ -47,34 +47,25 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   const parsed = addressPatchSchema.safeParse(body)
   if (!parsed.success) return validationError(parsed.error.flatten())
 
-  const { expectedUpdatedAt, clearCompletionDate, ...input } = parsed.data
+  const { expectedUpdatedAt, ...input } = parsed.data
 
   if (expectedUpdatedAt && new Date(expectedUpdatedAt).getTime() !== existing.updatedAt.getTime()) {
     return conflict('This request was changed by someone else. Reload to see the latest.', existing)
   }
 
-  const merged = {
+  const next = {
     requestDate: input.requestDate !== undefined ? new Date(input.requestDate) : existing.requestDate,
-    reporter: input.reporter !== undefined ? input.reporter.trim() : existing.reporter,
+    reporter: input.reporter !== undefined ? (input.reporter?.trim() || null) : existing.reporter,
     reportedById: input.reportedById !== undefined ? (input.reportedById || null) : existing.reportedById,
+    popName: input.popName !== undefined ? (input.popName?.trim() || null) : existing.popName,
     tinaUuid: input.tinaUuid !== undefined ? (input.tinaUuid?.trim() || null) : existing.tinaUuid,
     aapId: input.aapId !== undefined ? (input.aapId?.trim() || null) : existing.aapId,
-    status: input.status ?? existing.status,
+    action: input.action ?? existing.action,
     notes: input.notes !== undefined ? (input.notes?.trim() || null) : existing.notes,
     completionDate: input.completionDate !== undefined
       ? (input.completionDate ? new Date(input.completionDate) : null)
       : existing.completionDate,
   }
-
-  // §7.4: leaving COMPLETED clears the date, unless this very request set one.
-  const leavingCompleted = existing.status === 'COMPLETED' && merged.status !== 'COMPLETED'
-  const { status, completionDate } = resolveCompletion({
-    status: merged.status,
-    completionDate: merged.completionDate,
-    clearCompletionDate: clearCompletionDate ?? (leavingCompleted && input.completionDate === undefined),
-  })
-
-  const next = { ...merged, status, completionDate }
 
   const invalid = validateAddressRecord(next)
   if (invalid) return NextResponse.json({ error: invalid }, { status: 400 })
@@ -128,22 +119,16 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     return conflict('This request was changed by someone else. Reload to see the latest.', existing)
   }
 
-  const { status, completionDate } = resolveCompletion({
-    status: input.status,
-    completionDate: input.completionDate ?? null,
-    // Moving away from COMPLETED clears the date unless one was sent explicitly.
-    clearCompletionDate: input.status !== 'COMPLETED' && !input.completionDate,
-  })
-
   const next = {
     requestDate: new Date(input.requestDate),
-    reporter: input.reporter.trim(),
+    reporter: input.reporter?.trim() || null,
     reportedById: input.reportedById || null,
+    popName: input.popName?.trim() || null,
     tinaUuid: input.tinaUuid?.trim() || null,
     aapId: input.aapId?.trim() || null,
-    status,
+    action: input.action,
     notes: input.notes?.trim() || null,
-    completionDate,
+    completionDate: input.completionDate ? new Date(input.completionDate) : null,
   }
 
   const changes = diffFields(
